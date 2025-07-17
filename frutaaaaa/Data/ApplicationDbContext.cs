@@ -14,15 +14,15 @@ namespace frutaaaaa.Data
         public DbSet<DailyProgramDetail> DailyProgramDetails { get; set; }
         public DbSet<Destination> Destinations { get; set; }
         public DbSet<Partenaire> Partenaires { get; set; }
-        public DbSet<variete> varietes { get; set; }
-
-
+       // public DbSet<variete> varietes { get; set; }
+        public DbSet<TPalette> TPalettes { get; set; }
+        public DbSet<grpvar> GrpVars { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
             modelBuilder.Entity<DailyProgramDetail>()
-                .HasKey(d => new { d.NumProg, d.Codvar });
+                 .HasKey(d => new { d.NumProg, d.codgrv });
 
             modelBuilder.Entity<Destination>(eb =>
             {
@@ -31,6 +31,13 @@ namespace frutaaaaa.Data
                 eb.Property(d => d.coddes).HasColumnName("coddes");
                 eb.Property(d => d.vildes).HasColumnName("vildes");
             });
+            modelBuilder.Entity<TPalette>(eb =>
+            {
+                eb.ToTable("tpalette");
+                eb.HasNoKey();
+                eb.Property(p => p.codtyp).HasColumnName("codtyp");
+                eb.Property(p => p.nomemb).HasColumnName("nomemb");
+            });
 
             modelBuilder.Entity<Partenaire>(eb =>
             {
@@ -38,13 +45,14 @@ namespace frutaaaaa.Data
                 eb.HasNoKey();
                 eb.Property(p => p.@ref).HasColumnName("ref");
                 eb.Property(p => p.nom).HasColumnName("nom");
+                eb.Property(p => p.type).HasColumnName("type"); // Add this line
             });
-            modelBuilder.Entity<variete>(eb =>
+            modelBuilder.Entity<grpvar>(eb =>
             {
-                eb.ToTable("variete");
+                eb.ToTable("grpvar");
                 eb.HasNoKey();
-                eb.Property(p => p.codvar).HasColumnName("codvar");
-                eb.Property(p => p.nomvar).HasColumnName("nomvar");
+                eb.Property(g => g.codgrv).HasColumnName("codgrv");
+                eb.Property(g => g.nomgrv).HasColumnName("nomgrv");
             });
         }
     }

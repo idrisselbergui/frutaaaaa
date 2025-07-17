@@ -24,19 +24,25 @@ namespace frutaaaaa.Controllers
         {
             return await _context.Destinations.ToListAsync();
         }
-
-        // This endpoint has been corrected
-        [HttpGet("partenaires")]
-        public async Task<ActionResult<IEnumerable<Partenaire>>> GetPartenaires()
+        [HttpGet("tpalettes")]
+        public async Task<ActionResult<IEnumerable<TPalette>>> GetTPalettes()
         {
-            // Uses the corrected DbSet name: Partenaires
-            return await _context.Partenaires.ToListAsync();
+            return await _context.TPalettes.ToListAsync();
+        }
+        // This endpoint has been corrected
+        [HttpGet("partenaires/{type}")]
+        public async Task<ActionResult<IEnumerable<Partenaire>>> GetPartenaires(string type)
+        {
+            // This now filters by the type provided in the URL
+            return await _context.Partenaires
+                                 .Where(p => p.type == type)
+                                 .ToListAsync();
         }
         // Add this new method inside the LookupController class
-        [HttpGet("varietes")]
-        public async Task<ActionResult<IEnumerable<variete>>> GetVarietes()
+        [HttpGet("grpvars")]
+        public async Task<ActionResult<IEnumerable<grpvar>>> GetGrpVars()
         {
-            return await _context.varietes.ToListAsync();
+            return await _context.GrpVars.ToListAsync();
         }
     }
 }

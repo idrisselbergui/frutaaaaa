@@ -15,14 +15,46 @@ namespace frutaaaaa.Controllers
         {
             _context = context;
         }
+        
+        // 1. GET: api/dailyprogram/dates
+        // This method returns a sorted list of unique dates that have programs.
+        [HttpGet("dates")]
+        public async Task<ActionResult<IEnumerable<string>>> GetProgramDates()
+        {
+            var dates = await _context.DailyPrograms
+                .OrderByDescending(p => p.Dteprog)
+                .Select(p => p.Dteprog.ToString("yyyy-MM-dd"))
+                .Distinct()
+                .ToListAsync();
+            return dates;
+        }
+
+        // 2. GET: api/dailyprogram?date=YYYY-MM-DD
+        // This gets programs for a single, specific date using the original DailyProgram model.
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<DailyProgram>>> GetDailyPrograms([FromQuery] string date)
+        {
+            if (!DateTime.TryParse(date, out DateTime parsedDate))
+            {
+                return BadRequest("Invalid date format. Please use YYYY-MM-DD.");
+            }
+
+            var programs = await _context.DailyPrograms
+                .Include(p => p.Details) // We still include details for the edit form
+                .Where(p => p.Dteprog >= parsedDate.Date && p.Dteprog < parsedDate.Date.AddDays(1))
+                .OrderByDescending(p => p.Id)
+                .ToListAsync();
+
+            return programs;
+        }
 
         // GET: api/dailyprogram
         // Gets all programs for the datagridview
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<DailyProgram>>> GetDailyPrograms()
-        {
-            return await _context.DailyPrograms.ToListAsync();
-        }
+        //[HttpGet]
+        //public async Task<ActionResult<IEnumerable<DailyProgram>>> GetDailyPrograms()
+        //{
+        //    return await _context.DailyPrograms.ToListAsync();
+        //}
 
         // GET: api/dailyprogram/5
         // Gets a single program with its details to populate the form for editing
@@ -109,5 +141,7 @@ namespace frutaaaaa.Controllers
 
             return NoContent();
         }
+
+       
     }
 }

@@ -12,8 +12,8 @@ using frutaaaaa.Data;
 namespace frutaaaaa.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250714135539_AddDailyProgramTables")]
-    partial class AddDailyProgramTables
+    [Migration("20250717143822_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,37 @@ namespace frutaaaaa.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+
+            modelBuilder.Entity("DailyProgramDetail", b =>
+                {
+                    b.Property<int>("NumProg")
+                        .HasColumnType("int");
+
+                    b.Property<int>("codgrv")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DailyProgramId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Nbrcoli")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Nbrpal")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Valide")
+                        .HasColumnType("int");
+
+                    b.Property<string>("codtyp")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("NumProg", "codgrv");
+
+                    b.HasIndex("DailyProgramId");
+
+                    b.ToTable("DailyProgramDetails");
+                });
 
             modelBuilder.Entity("Destination", b =>
                 {
@@ -50,7 +81,27 @@ namespace frutaaaaa.Migrations
                         .HasColumnType("int")
                         .HasColumnName("ref");
 
+                    b.Property<string>("type")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("type");
+
                     b.ToTable("partenaire", (string)null);
+                });
+
+            modelBuilder.Entity("TPalette", b =>
+                {
+                    b.Property<string>("codtyp")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("codtyp");
+
+                    b.Property<string>("nomemb")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("nomemb");
+
+                    b.ToTable("tpalette", (string)null);
                 });
 
             modelBuilder.Entity("frutaaaaa.Models.DailyProgram", b =>
@@ -89,33 +140,6 @@ namespace frutaaaaa.Migrations
                     b.ToTable("DailyPrograms");
                 });
 
-            modelBuilder.Entity("frutaaaaa.Models.DailyProgramDetail", b =>
-                {
-                    b.Property<int>("NumProg")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Codvar")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("DailyProgramId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Nbrcoli")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Nbrpal")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Valide")
-                        .HasColumnType("int");
-
-                    b.HasKey("NumProg", "Codvar");
-
-                    b.HasIndex("DailyProgramId");
-
-                    b.ToTable("DailyProgramDetails");
-                });
-
             modelBuilder.Entity("frutaaaaa.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -140,21 +164,21 @@ namespace frutaaaaa.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("frutaaaaa.Models.variete", b =>
+            modelBuilder.Entity("grpvar", b =>
                 {
-                    b.Property<int>("codvar")
+                    b.Property<int>("codgrv")
                         .HasColumnType("int")
-                        .HasColumnName("codvar");
+                        .HasColumnName("codgrv");
 
-                    b.Property<string>("nomvar")
+                    b.Property<string>("nomgrv")
                         .IsRequired()
                         .HasColumnType("longtext")
-                        .HasColumnName("nomvar");
+                        .HasColumnName("nomgrv");
 
-                    b.ToTable("variete", (string)null);
+                    b.ToTable("grpvar", (string)null);
                 });
 
-            modelBuilder.Entity("frutaaaaa.Models.DailyProgramDetail", b =>
+            modelBuilder.Entity("DailyProgramDetail", b =>
                 {
                     b.HasOne("frutaaaaa.Models.DailyProgram", null)
                         .WithMany("Details")
