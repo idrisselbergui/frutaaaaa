@@ -61,38 +61,66 @@ public class DashboardController : ControllerBase
         double ecartPercentage = (totalPdsfru > 0) ? (totalEcart / totalPdsfru) * 100 : 0;
 
         // --- 3. Calculer les données groupées pour la table ---
-        var pdsfruGroups = await palBrutQuery
-            .GroupBy(p => new { p.refver, p.codvar })
-            .Select(g => new { VergerId = g.Key.refver, VarieteId = g.Key.codvar, Total = g.Sum(p => p.pdsfru ?? 0) })
-            .ToListAsync();
+        var pdsfruGroups = await palBrutQuery.GroupBy(p => new { p.refver, p.codvar }).Select(g => new { VergerId = g.Key.refver, VarieteId = g.Key.codvar, Total = g.Sum(p => p.pdsfru ?? 0) }).ToListAsync();
+        var pdscomGroups = await paletteDQuery.GroupBy(x => new { x.PaletteD.refver, x.PaletteD.codvar }).Select(g => new { VergerId = g.Key.refver, VarieteId = g.Key.codvar, Total = g.Sum(x => x.PaletteD.pdscom ?? 0) }).ToListAsync();
+        var ecartGroups = await ecartQuery.GroupBy(e => new { e.refver, e.codvar }).Select(g => new { VergerId = g.Key.refver, VarieteId = (int?)g.Key.codvar, Total = g.Sum(e => e.pdsfru) }).ToListAsync();
 
-        var pdscomGroups = await paletteDQuery
-            .GroupBy(x => new { x.PaletteD.refver, x.PaletteD.codvar })
-            .Select(g => new { VergerId = g.Key.refver, VarieteId = g.Key.codvar, Total = g.Sum(x => x.PaletteD.pdscom ?? 0) })
-            .ToListAsync();
-
-        var ecartGroups = await ecartQuery
-            .GroupBy(e => new { e.refver, e.codvar })
-            .Select(g => new { VergerId = g.Key.refver, VarieteId = g.Key.codvar, Total = g.Sum(e => e.pdsfru) })
-            .ToListAsync();
-
-        // --- 4. Fusionner les résultats en mémoire ---
-        var allKeys = pdsfruGroups.Select(p => (p.VergerId, p.VarieteId))
-            .Union(pdscomGroups.Select(p => (p.VergerId, p.VarieteId)))
-            .Union(ecartGroups.Select(p => (p.VergerId, p.VarieteId)))
-            .Distinct();
-
+        // --- 4. Calculer les données des graphiques (MÉTHODE CORRIGÉE) ---
         var vergers = await _context.Vergers.ToDictionaryAsync(v => v.refver, v => v.nomver);
+
+        var receptionChartData = pdsfruGroups
+            .GroupBy(p => p.VergerId)
+            .Select(g => new ChartDataDto
+            {
+                RefVer = g.Key.ToString(),
+                Name = g.Key.HasValue && vergers.ContainsKey(g.Key.Value) ? vergers[g.Key.Value] : $"Verger inconnu ({g.Key})",
+                Value = (decimal)g.Sum(p => p.Total)
+            })
+            .OrderByDescending(x => x.Value)
+            .ToList();
+
+        var exportChartData = pdscomGroups
+            .GroupBy(p => p.VergerId)
+            .Select(g => new ChartDataDto
+            {
+                RefVer = g.Key.ToString(),
+                Name = g.Key.HasValue && vergers.ContainsKey(g.Key.Value) ? vergers[g.Key.Value] : $"Verger inconnu ({g.Key})",
+                Value = g.Sum(p => p.Total)
+            })
+            .OrderByDescending(x => x.Value)
+            .ToList();
+
+        // --- 5. Fusionner les résultats en mémoire ---
+        var allData = new Dictionary<(int?, int?), DashboardTableRowDto>();
         var varietes = await _context.Varietes.ToDictionaryAsync(v => v.codvar, v => v.nomvar);
 
-        var tableRows = allKeys.Select(key => new DashboardTableRowDto
+        foreach (var group in pdsfruGroups)
         {
-            VergerName = key.VergerId.HasValue && vergers.ContainsKey(key.VergerId.Value) ? vergers[key.VergerId.Value] : "N/A",
-            VarieteName = key.VarieteId.HasValue && varietes.ContainsKey(key.VarieteId.Value) ? varietes[key.VarieteId.Value] : "N/A",
-            TotalPdsfru = pdsfruGroups.FirstOrDefault(f => f.VergerId == key.VergerId && f.VarieteId == key.VarieteId)?.Total ?? 0,
-            TotalPdscom = pdscomGroups.FirstOrDefault(c => c.VergerId == key.VergerId && c.VarieteId == key.VarieteId)?.Total ?? 0,
-            TotalEcart = ecartGroups.FirstOrDefault(e => e.VergerId == key.VergerId && e.VarieteId == key.VarieteId)?.Total ?? 0
-        }).ToList();
+            var key = (group.VergerId, group.VarieteId);
+            if (!allData.ContainsKey(key))
+            {
+                allData[key] = new DashboardTableRowDto { VergerName = key.Item1.HasValue && vergers.ContainsKey(key.Item1.Value) ? vergers[key.Item1.Value] : "N/A", VarieteName = key.Item2.HasValue && varietes.ContainsKey(key.Item2.Value) ? varietes[key.Item2.Value] : "N/A" };
+            }
+            allData[key].TotalPdsfru = group.Total;
+        }
+        foreach (var group in pdscomGroups)
+        {
+            var key = (group.VergerId, group.VarieteId);
+            if (!allData.ContainsKey(key))
+            {
+                allData[key] = new DashboardTableRowDto { VergerName = key.Item1.HasValue && vergers.ContainsKey(key.Item1.Value) ? vergers[key.Item1.Value] : "N/A", VarieteName = key.Item2.HasValue && varietes.ContainsKey(key.Item2.Value) ? varietes[key.Item2.Value] : "N/A" };
+            }
+            allData[key].TotalPdscom = group.Total;
+        }
+        foreach (var group in ecartGroups)
+        {
+            var key = (group.VergerId, group.VarieteId);
+            if (!allData.ContainsKey(key))
+            {
+                allData[key] = new DashboardTableRowDto { VergerName = key.Item1.HasValue && vergers.ContainsKey(key.Item1.Value) ? vergers[key.Item1.Value] : "N/A", VarieteName = key.Item2.HasValue && varietes.ContainsKey(key.Item2.Value) ? varietes[key.Item2.Value] : "N/A" };
+            }
+            allData[key].TotalEcart = group.Total;
+        }
 
         var result = new DashboardDataDto
         {
@@ -101,7 +129,9 @@ public class DashboardController : ControllerBase
             ExportPercentage = exportPercentage,
             TotalEcart = totalEcart,
             EcartPercentage = ecartPercentage,
-            TableRows = tableRows
+            TableRows = allData.Values.ToList(),
+            ReceptionByVergerChart = receptionChartData,
+            ExportByVergerChart = exportChartData
         };
 
         return Ok(result);
