@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace frutaaaaa.Migrations
 {
     /// <inheritdoc />
-    public partial class AddDashboardTables : Migration
+    public partial class AddEcartTable : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -44,6 +44,24 @@ namespace frutaaaaa.Migrations
                     coddes = table.Column<int>(type: "int", nullable: false),
                     vildes = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
+                },
+                constraints: table =>
+                {
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "ecart_e",
+                columns: table => new
+                {
+                    numpal = table.Column<int>(type: "int", nullable: false),
+                    dtepal = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    codvar = table.Column<int>(type: "int", nullable: false),
+                    codtype = table.Column<int>(type: "int", nullable: false),
+                    tarpal = table.Column<double>(type: "double", nullable: false),
+                    pdspes = table.Column<double>(type: "double", nullable: false),
+                    pdsfru = table.Column<double>(type: "double", nullable: false),
+                    refver = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -239,6 +257,9 @@ namespace frutaaaaa.Migrations
 
             migrationBuilder.DropTable(
                 name: "destination");
+
+            migrationBuilder.DropTable(
+                name: "ecart_e");
 
             migrationBuilder.DropTable(
                 name: "grpvar");

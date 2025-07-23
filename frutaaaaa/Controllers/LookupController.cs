@@ -49,5 +49,12 @@ namespace frutaaaaa.Controllers
         {
             return await _context.Varietes.ToListAsync();
         }
+        // Add this new method inside your LookupController class
+
+        [HttpGet("vergers")]
+        public async Task<ActionResult<IEnumerable<Verger>>> GetVergers()
+        {
+            return await _context.Vergers.ToListAsync();
+        }
     }
 }

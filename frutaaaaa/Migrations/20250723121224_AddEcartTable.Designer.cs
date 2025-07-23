@@ -12,8 +12,8 @@ using frutaaaaa.Data;
 namespace frutaaaaa.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250722172630_AddDashboardTables")]
-    partial class AddDashboardTables
+    [Migration("20250723121224_AddEcartTable")]
+    partial class AddEcartTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -143,6 +143,35 @@ namespace frutaaaaa.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("DailyPrograms");
+                });
+
+            modelBuilder.Entity("frutaaaaa.Models.EcartE", b =>
+                {
+                    b.Property<int>("codtype")
+                        .HasColumnType("int");
+
+                    b.Property<int>("codvar")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("dtepal")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("numpal")
+                        .HasColumnType("int");
+
+                    b.Property<double>("pdsfru")
+                        .HasColumnType("double");
+
+                    b.Property<double>("pdspes")
+                        .HasColumnType("double");
+
+                    b.Property<int?>("refver")
+                        .HasColumnType("int");
+
+                    b.Property<double>("tarpal")
+                        .HasColumnType("double");
+
+                    b.ToTable("ecart_e", (string)null);
                 });
 
             modelBuilder.Entity("frutaaaaa.Models.PalBrut", b =>

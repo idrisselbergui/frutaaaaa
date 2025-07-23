@@ -22,7 +22,7 @@ namespace frutaaaaa.Data
         public DbSet<Palette> Palettes { get; set; }
         public DbSet<Palette_d> Palette_ds { get; set; }
         public DbSet<Variete> Varietes { get; set; }
-
+        public DbSet<EcartE> EcartEs { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -67,6 +67,11 @@ namespace frutaaaaa.Data
                 eb.ToTable("variete");
                 eb.HasNoKey();
               
+            });
+            modelBuilder.Entity<EcartE>(eb =>
+            {
+                eb.ToTable("ecart_e");
+                eb.HasNoKey(); // As requested, this is a keyless entity for viewing data
             });
         }
     }
