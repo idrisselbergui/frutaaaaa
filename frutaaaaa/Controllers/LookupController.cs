@@ -40,9 +40,14 @@ namespace frutaaaaa.Controllers
         }
         // Add this new method inside the LookupController class
         [HttpGet("grpvars")]
-        public async Task<ActionResult<IEnumerable<grpvar>>> GetGrpVars()
+        public async Task<ActionResult<IEnumerable<GrpVar>>> GetGrpVars()
         {
-            return await _context.GrpVars.ToListAsync();
+            return await _context.grpvars.ToListAsync();
+        }
+        [HttpGet("varietes")]
+        public async Task<ActionResult<IEnumerable<Variete>>> GetVarietes()
+        {
+            return await _context.Varietes.ToListAsync();
         }
     }
 }

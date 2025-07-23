@@ -42,7 +42,7 @@ namespace frutaaaaa.Controllers
             var programs = await _context.DailyPrograms
                 .Include(p => p.Details) // We still include details for the edit form
                 .Where(p => p.Dteprog >= parsedDate.Date && p.Dteprog < parsedDate.Date.AddDays(1))
-                .OrderByDescending(p => p.Id)
+                .OrderByDescending(p => p.Dteprog)
                 .ToListAsync();
 
             return programs;

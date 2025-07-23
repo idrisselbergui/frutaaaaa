@@ -9,50 +9,64 @@ namespace frutaaaaa.Data
         {
         }
 
+        // DbSets
         public DbSet<User> Users { get; set; }
         public DbSet<DailyProgram> DailyPrograms { get; set; }
         public DbSet<DailyProgramDetail> DailyProgramDetails { get; set; }
         public DbSet<Destination> Destinations { get; set; }
         public DbSet<Partenaire> Partenaires { get; set; }
-       // public DbSet<variete> varietes { get; set; }
         public DbSet<TPalette> TPalettes { get; set; }
-        public DbSet<grpvar> GrpVars { get; set; }
+        public DbSet<GrpVar> grpvars { get; set; }
+        public DbSet<Verger> Vergers { get; set; }
+        public DbSet<PalBrut> palbruts { get; set; }
+        public DbSet<Palette> Palettes { get; set; }
+        public DbSet<Palette_d> Palette_ds { get; set; }
+        public DbSet<Variete> Varietes { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
+            // Existing Configurations
             modelBuilder.Entity<DailyProgramDetail>()
-                 .HasKey(d => new { d.NumProg, d.codgrv });
+                .HasKey(d => new { d.NumProg, d.codgrv });
 
-            modelBuilder.Entity<Destination>(eb =>
+            modelBuilder.Entity<Destination>().ToTable("destination").HasNoKey();
+            modelBuilder.Entity<Partenaire>().ToTable("partenaire").HasNoKey();
+            modelBuilder.Entity<GrpVar>().ToTable("grpvar").HasNoKey();
+            modelBuilder.Entity<TPalette>().ToTable("tpalette").HasNoKey();
+
+            // --- THIS IS THE CORRECTED SECTION ---
+            modelBuilder.Entity<Verger>(eb =>
             {
-                eb.ToTable("destination");
+                eb.ToTable("verger");
                 eb.HasNoKey();
-                eb.Property(d => d.coddes).HasColumnName("coddes");
-                eb.Property(d => d.vildes).HasColumnName("vildes");
-            });
-            modelBuilder.Entity<TPalette>(eb =>
-            {
-                eb.ToTable("tpalette");
-                eb.HasNoKey();
-                eb.Property(p => p.codtyp).HasColumnName("codtyp");
-                eb.Property(p => p.nomemb).HasColumnName("nomemb");
+             
             });
 
-            modelBuilder.Entity<Partenaire>(eb =>
+            modelBuilder.Entity<PalBrut>(eb =>
             {
-                eb.ToTable("partenaire");
+                eb.ToTable("palbrut");
                 eb.HasNoKey();
-                eb.Property(p => p.@ref).HasColumnName("ref");
-                eb.Property(p => p.nom).HasColumnName("nom");
-                eb.Property(p => p.type).HasColumnName("type"); // Add this line
             });
-            modelBuilder.Entity<grpvar>(eb =>
+
+            modelBuilder.Entity<Palette>(eb =>
             {
-                eb.ToTable("grpvar");
+                eb.ToTable("palette");
                 eb.HasNoKey();
-                eb.Property(g => g.codgrv).HasColumnName("codgrv");
-                eb.Property(g => g.nomgrv).HasColumnName("nomgrv");
+            });
+
+            modelBuilder.Entity<Palette_d>(eb =>
+            {
+                eb.ToTable("palette_d");
+                eb.HasNoKey();
+            });
+
+            modelBuilder.Entity<Variete>(eb =>
+            {
+                eb.ToTable("variete");
+                eb.HasNoKey();
+              
             });
         }
     }

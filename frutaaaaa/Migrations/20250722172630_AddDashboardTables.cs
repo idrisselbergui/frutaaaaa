@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace frutaaaaa.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class AddDashboardTables : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -64,6 +64,70 @@ namespace frutaaaaa.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "palbrut",
+                columns: table => new
+                {
+                    numpal = table.Column<int>(type: "int", nullable: false),
+                    numrec = table.Column<int>(type: "int", nullable: true),
+                    dterec = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    refadh = table.Column<int>(type: "int", nullable: true),
+                    refver = table.Column<int>(type: "int", nullable: true),
+                    codvar = table.Column<int>(type: "int", nullable: true),
+                    nbrcai = table.Column<int>(type: "int", nullable: true),
+                    pdsfru = table.Column<double>(type: "double", nullable: true),
+                    etat = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    codsvar = table.Column<int>(type: "int", nullable: true),
+                    codtyp = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    caiver = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "palette",
+                columns: table => new
+                {
+                    numpal = table.Column<int>(type: "int", nullable: false),
+                    dtepal = table.Column<DateTime>(type: "datetime(6)", nullable: true),
+                    colpal = table.Column<int>(type: "int", nullable: true),
+                    pdscom = table.Column<decimal>(type: "decimal(65,30)", nullable: true),
+                    pdsfru = table.Column<decimal>(type: "decimal(65,30)", nullable: true),
+                    codtyp = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    numbdq = table.Column<int>(type: "int", nullable: true),
+                    codmar = table.Column<int>(type: "int", nullable: true),
+                    codvar = table.Column<int>(type: "int", nullable: true),
+                    codgrp = table.Column<int>(type: "int", nullable: true),
+                    codexp = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "palette_d",
+                columns: table => new
+                {
+                    numpal = table.Column<int>(type: "int", nullable: true),
+                    nbrcol = table.Column<int>(type: "int", nullable: true),
+                    nbrfru = table.Column<int>(type: "int", nullable: true),
+                    refver = table.Column<int>(type: "int", nullable: true),
+                    pdscom = table.Column<decimal>(type: "decimal(65,30)", nullable: true),
+                    pdsfru = table.Column<decimal>(type: "decimal(65,30)", nullable: true),
+                    numbdq = table.Column<int>(type: "int", nullable: true),
+                    codvar = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "partenaire",
                 columns: table => new
                 {
@@ -111,6 +175,33 @@ namespace frutaaaaa.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "variete",
+                columns: table => new
+                {
+                    codvar = table.Column<int>(type: "int", nullable: false),
+                    nomvar = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4")
+                },
+                constraints: table =>
+                {
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "verger",
+                columns: table => new
+                {
+                    refver = table.Column<int>(type: "int", nullable: false),
+                    refadh = table.Column<int>(type: "int", nullable: true),
+                    nomver = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4")
+                },
+                constraints: table =>
+                {
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "DailyProgramDetails",
                 columns: table => new
                 {
@@ -153,6 +244,15 @@ namespace frutaaaaa.Migrations
                 name: "grpvar");
 
             migrationBuilder.DropTable(
+                name: "palbrut");
+
+            migrationBuilder.DropTable(
+                name: "palette");
+
+            migrationBuilder.DropTable(
+                name: "palette_d");
+
+            migrationBuilder.DropTable(
                 name: "partenaire");
 
             migrationBuilder.DropTable(
@@ -160,6 +260,12 @@ namespace frutaaaaa.Migrations
 
             migrationBuilder.DropTable(
                 name: "Users");
+
+            migrationBuilder.DropTable(
+                name: "variete");
+
+            migrationBuilder.DropTable(
+                name: "verger");
 
             migrationBuilder.DropTable(
                 name: "DailyPrograms");

@@ -12,8 +12,8 @@ using frutaaaaa.Data;
 namespace frutaaaaa.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250717143822_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250722172630_AddDashboardTables")]
+    partial class AddDashboardTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -59,32 +59,39 @@ namespace frutaaaaa.Migrations
             modelBuilder.Entity("Destination", b =>
                 {
                     b.Property<int>("coddes")
-                        .HasColumnType("int")
-                        .HasColumnName("coddes");
+                        .HasColumnType("int");
 
                     b.Property<string>("vildes")
                         .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("vildes");
+                        .HasColumnType("longtext");
 
                     b.ToTable("destination", (string)null);
+                });
+
+            modelBuilder.Entity("GrpVar", b =>
+                {
+                    b.Property<int>("codgrv")
+                        .HasColumnType("int");
+
+                    b.Property<string>("nomgrv")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.ToTable("grpvar", (string)null);
                 });
 
             modelBuilder.Entity("Partenaire", b =>
                 {
                     b.Property<string>("nom")
                         .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("nom");
+                        .HasColumnType("longtext");
 
                     b.Property<int>("ref")
-                        .HasColumnType("int")
-                        .HasColumnName("ref");
+                        .HasColumnType("int");
 
                     b.Property<string>("type")
                         .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("type");
+                        .HasColumnType("longtext");
 
                     b.ToTable("partenaire", (string)null);
                 });
@@ -93,13 +100,11 @@ namespace frutaaaaa.Migrations
                 {
                     b.Property<string>("codtyp")
                         .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("codtyp");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("nomemb")
                         .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("nomemb");
+                        .HasColumnType("longtext");
 
                     b.ToTable("tpalette", (string)null);
                 });
@@ -140,6 +145,117 @@ namespace frutaaaaa.Migrations
                     b.ToTable("DailyPrograms");
                 });
 
+            modelBuilder.Entity("frutaaaaa.Models.PalBrut", b =>
+                {
+                    b.Property<int?>("caiver")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("codsvar")
+                        .HasColumnType("int");
+
+                    b.Property<string>("codtyp")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("codvar")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("dterec")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("etat")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("nbrcai")
+                        .HasColumnType("int");
+
+                    b.Property<int>("numpal")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("numrec")
+                        .HasColumnType("int");
+
+                    b.Property<double?>("pdsfru")
+                        .HasColumnType("double");
+
+                    b.Property<int?>("refadh")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("refver")
+                        .HasColumnType("int");
+
+                    b.ToTable("palbrut", (string)null);
+                });
+
+            modelBuilder.Entity("frutaaaaa.Models.Palette", b =>
+                {
+                    b.Property<int?>("codexp")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("codgrp")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("codmar")
+                        .HasColumnType("int");
+
+                    b.Property<string>("codtyp")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("codvar")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("colpal")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("dtepal")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("numbdq")
+                        .HasColumnType("int");
+
+                    b.Property<int>("numpal")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("pdscom")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal?>("pdsfru")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.ToTable("palette", (string)null);
+                });
+
+            modelBuilder.Entity("frutaaaaa.Models.Palette_d", b =>
+                {
+                    b.Property<int?>("codvar")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("nbrcol")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("nbrfru")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("numbdq")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("numpal")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("pdscom")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal?>("pdsfru")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int?>("refver")
+                        .HasColumnType("int");
+
+                    b.ToTable("palette_d", (string)null);
+                });
+
             modelBuilder.Entity("frutaaaaa.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -164,18 +280,31 @@ namespace frutaaaaa.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("grpvar", b =>
+            modelBuilder.Entity("frutaaaaa.Models.Variete", b =>
                 {
-                    b.Property<int>("codgrv")
-                        .HasColumnType("int")
-                        .HasColumnName("codgrv");
+                    b.Property<int>("codvar")
+                        .HasColumnType("int");
 
-                    b.Property<string>("nomgrv")
+                    b.Property<string>("nomvar")
                         .IsRequired()
-                        .HasColumnType("longtext")
-                        .HasColumnName("nomgrv");
+                        .HasColumnType("longtext");
 
-                    b.ToTable("grpvar", (string)null);
+                    b.ToTable("variete", (string)null);
+                });
+
+            modelBuilder.Entity("frutaaaaa.Models.Verger", b =>
+                {
+                    b.Property<string>("nomver")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int?>("refadh")
+                        .HasColumnType("int");
+
+                    b.Property<int>("refver")
+                        .HasColumnType("int");
+
+                    b.ToTable("verger", (string)null);
                 });
 
             modelBuilder.Entity("DailyProgramDetail", b =>
