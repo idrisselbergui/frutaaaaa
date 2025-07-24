@@ -23,6 +23,9 @@ namespace frutaaaaa.Data
         public DbSet<Palette_d> Palette_ds { get; set; }
         public DbSet<Variete> Varietes { get; set; }
         public DbSet<EcartE> EcartEs { get; set; }
+        public DbSet<ViewExpVerVar> ViewExpVerVars { get; set; }
+        public DbSet<Bdq> Bdqs { get; set; }
+        public DbSet<Dossier> Dossiers { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -73,6 +76,27 @@ namespace frutaaaaa.Data
                 eb.ToTable("ecart_e");
                 eb.HasNoKey(); // As requested, this is a keyless entity for viewing data
             });
+            modelBuilder.Entity<ViewExpVerVar>(eb =>
+            {
+                eb.ToView("view_expvervar"); // Indique à EF que c'est une vue
+                eb.HasNoKey();
+                // Mapper la colonne SUM
+                eb.Property(v => v.pdscom).HasColumnName("SUM(p.pdscom)");
+            });
+            modelBuilder.Entity<Bdq>(eb =>
+            {
+                eb.ToTable("bdq");
+                eb.HasNoKey();
+            });
+
+            modelBuilder.Entity<Dossier>(eb =>
+            {
+                eb.ToTable("dossier");
+                eb.HasNoKey();
+            });
+
+
+
         }
     }
 }
