@@ -118,7 +118,7 @@ public class DashboardController : ControllerBase
         return Ok(result);
     }
 
-    // --- NOUVELLE MÉTHODE DÉDIÉE AU GRAPHIQUE DESTINATION ---
+    // --- MÉTHODE CORRIGÉE POUR LE GRAPHIQUE EMPILÉ ---
     [HttpGet("destination-chart")]
     public async Task<ActionResult<object>> GetDestinationChartData(
         [FromQuery] DateTime startDate,
@@ -133,35 +133,35 @@ public class DashboardController : ControllerBase
                     join p in _context.Palettes on pd.numpal equals p.numpal
                     join b in _context.Bdqs on pd.numbdq equals b.numbdq
                     join d in _context.Dossiers on b.numdos equals d.numdos
-                    join dest in _context.Destinations on d.coddes equals dest.coddes
                     join v in _context.Vergers on pd.refver equals v.refver
+                    join va in _context.Varietes on pd.codvar equals va.codvar
                     where p.dtepal >= startDate.Date && p.dtepal <= endDateInclusive
-                    select new { pd, p, dest, v };
+                    select new { pd, p, d, v, va };
 
         if (vergerId.HasValue) query = query.Where(x => x.pd.refver == vergerId.Value);
         if (varieteId.HasValue) query = query.Where(x => x.pd.codvar == varieteId.Value);
-        if (destinationId.HasValue) query = query.Where(x => x.dest.coddes == destinationId.Value);
+        if (destinationId.HasValue) query = query.Where(x => x.d.coddes == destinationId.Value);
 
         var flatData = await query
-            .GroupBy(x => new { x.dest.vildes, x.v.nomver })
+            .GroupBy(x => new { x.v.nomver, x.va.nomvar })
             .Select(g => new {
-                DestinationName = g.Key.vildes,
                 VergerName = g.Key.nomver,
+                VarieteName = g.Key.nomvar,
                 TotalPdscom = g.Sum(item => item.pd.pdscom ?? 0)
             })
             .ToListAsync();
 
         var groupedData = flatData
-            .GroupBy(x => x.DestinationName)
+            .GroupBy(x => x.VergerName)
             .Select(g => {
                 var resultObject = new Dictionary<string, object> { ["name"] = g.Key };
-                foreach (var item in g) { resultObject[item.VergerName] = item.TotalPdscom; }
+                foreach (var item in g) { resultObject[item.VarieteName] = item.TotalPdscom; }
                 return resultObject;
             })
             .ToList();
 
-        var allVergers = flatData.Select(x => x.VergerName).Distinct().ToList();
+        var allVarietes = flatData.Select(x => x.VarieteName).Distinct().ToList();
 
-        return Ok(new { data = groupedData, keys = allVergers });
+        return Ok(new { data = groupedData, keys = allVarietes });
     }
 }
