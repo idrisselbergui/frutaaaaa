@@ -142,26 +142,78 @@ public class DashboardController : ControllerBase
         if (varieteId.HasValue) query = query.Where(x => x.pd.codvar == varieteId.Value);
         if (destinationId.HasValue) query = query.Where(x => x.d.coddes == destinationId.Value);
 
+        //var flatData = await query
+        //    .GroupBy(x => new { x.v.nomver, x.va.nomvar })
+        //    .Select(g => new {
+        //        VergerName = g.Key.nomver,
+        //        VarieteName = g.Key.nomvar,
+        //        TotalPdscom = g.Sum(item => item.pd.pdscom ?? 0)
+        //    })
+        //    .ToListAsync();
+
+        //var groupedData = flatData
+        //    .GroupBy(x => x.VergerName)
+        //    .Select(g => {
+        //        var resultObject = new Dictionary<string, object> { ["name"] = g.Key };
+        //        foreach (var item in g) { resultObject[item.VarieteName] = item.TotalPdscom; }
+        //        return resultObject;
+        //    })
+        //    .ToList();
         var flatData = await query
-            .GroupBy(x => new { x.v.nomver, x.va.nomvar })
+            .GroupBy(x => new { x.v.refver, x.v.nomver, x.va.nomvar })
             .Select(g => new {
+                RefVer = g.Key.refver,
                 VergerName = g.Key.nomver,
                 VarieteName = g.Key.nomvar,
                 TotalPdscom = g.Sum(item => item.pd.pdscom ?? 0)
             })
             .ToListAsync();
 
+        // --- CORRECTION ICI : Regrouper par RefVer et VergerName ---
+
         var groupedData = flatData
-            .GroupBy(x => x.VergerName)
+            .GroupBy(x => new { x.RefVer, x.VergerName })
+            .Select(g => new {
+                GroupKey = g.Key,
+                Items = g.ToList(),
+                TotalPdscomForVerger = g.Sum(item => item.TotalPdscom) // Calculer le total pour le tri
+            })
+            .OrderByDescending(x => x.TotalPdscomForVerger) // Trier par le total
             .Select(g => {
-                var resultObject = new Dictionary<string, object> { ["name"] = g.Key };
-                foreach (var item in g) { resultObject[item.VarieteName] = item.TotalPdscom; }
+                var resultObject = new Dictionary<string, object>
+                {
+                    ["refver"] = g.GroupKey.RefVer,
+                    ["name"] = g.GroupKey.VergerName
+                };
+                foreach (var item in g.Items)
+                {
+                    resultObject[item.VarieteName] = item.TotalPdscom;
+                }
                 return resultObject;
             })
             .ToList();
+        //var groupedData = flatData
+        //    .GroupBy(x => new { x.RefVer, x.VergerName })
+        //    .Select(g => {
+        //        var resultObject = new Dictionary<string, object>
+        //        {
+        //            ["refver"] = g.Key.RefVer, // Ajouter le refver pour l'axe X
+        //            ["name"] = g.Key.VergerName // Ajouter le nomver pour l'infobulle
+        //        };
+        //        foreach (var item in g)
+        //        {
+        //            resultObject[item.VarieteName] = item.TotalPdscom;
+        //        }
+        //        return resultObject;
+        //    })
+        //    .ToList();
 
         var allVarietes = flatData.Select(x => x.VarieteName).Distinct().ToList();
 
         return Ok(new { data = groupedData, keys = allVarietes });
     }
+
+
+
+
 }
