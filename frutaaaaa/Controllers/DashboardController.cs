@@ -142,23 +142,6 @@ public class DashboardController : ControllerBase
         if (varieteId.HasValue) query = query.Where(x => x.pd.codvar == varieteId.Value);
         if (destinationId.HasValue) query = query.Where(x => x.d.coddes == destinationId.Value);
 
-        //var flatData = await query
-        //    .GroupBy(x => new { x.v.nomver, x.va.nomvar })
-        //    .Select(g => new {
-        //        VergerName = g.Key.nomver,
-        //        VarieteName = g.Key.nomvar,
-        //        TotalPdscom = g.Sum(item => item.pd.pdscom ?? 0)
-        //    })
-        //    .ToListAsync();
-
-        //var groupedData = flatData
-        //    .GroupBy(x => x.VergerName)
-        //    .Select(g => {
-        //        var resultObject = new Dictionary<string, object> { ["name"] = g.Key };
-        //        foreach (var item in g) { resultObject[item.VarieteName] = item.TotalPdscom; }
-        //        return resultObject;
-        //    })
-        //    .ToList();
         var flatData = await query
             .GroupBy(x => new { x.v.refver, x.v.nomver, x.va.nomvar })
             .Select(g => new {
@@ -192,27 +175,82 @@ public class DashboardController : ControllerBase
                 return resultObject;
             })
             .ToList();
-        //var groupedData = flatData
-        //    .GroupBy(x => new { x.RefVer, x.VergerName })
-        //    .Select(g => {
-        //        var resultObject = new Dictionary<string, object>
-        //        {
-        //            ["refver"] = g.Key.RefVer, // Ajouter le refver pour l'axe X
-        //            ["name"] = g.Key.VergerName // Ajouter le nomver pour l'infobulle
-        //        };
-        //        foreach (var item in g)
-        //        {
-        //            resultObject[item.VarieteName] = item.TotalPdscom;
-        //        }
-        //        return resultObject;
-        //    })
-        //    .ToList();
+        
 
         var allVarietes = flatData.Select(x => x.VarieteName).Distinct().ToList();
 
         return Ok(new { data = groupedData, keys = allVarietes });
     }
+    // In your DashboardController.cs file
+    // Add this new method to your DashboardController.cs
 
+    // --- NEW METHOD FOR THE REQUIRED CHART ---
+    // This endpoint shows sales by destination, for a specific, required orchard.
+    [HttpGet("destination-by-variety-chart")]
+    public async Task<ActionResult<object>> GetDestinationByVarietyChart(
+     [FromQuery] DateTime startDate,
+     [FromQuery] DateTime endDate,
+     [FromQuery] int vergerId, // Required
+     [FromQuery] int? varieteId) // Optional
+    {
+        var endDateInclusive = endDate.Date.AddDays(1).AddTicks(-1);
+
+        var query = from pd in _context.Palette_ds
+                    join p in _context.Palettes on pd.numpal equals p.numpal
+                    join b in _context.Bdqs on pd.numbdq equals b.numbdq
+                    join d in _context.Dossiers on b.numdos equals d.numdos
+                    join dest in _context.Destinations on d.coddes equals dest.coddes
+                    join va in _context.Varietes on pd.codvar equals va.codvar
+                    where p.dtepal >= startDate.Date && p.dtepal <= endDateInclusive
+                    && pd.refver == vergerId // Filter by the required orchard
+                    select new { pd, dest, va };
+
+        if (varieteId.HasValue)
+        {
+            query = query.Where(x => x.pd.codvar == varieteId.Value);
+        }
+
+        var flatData = await query
+            .GroupBy(x => new {
+                DestinationName = x.dest.vildes,
+                VarieteName = x.va.nomvar
+            })
+            .Select(g => new {
+                g.Key.DestinationName,
+                g.Key.VarieteName,
+                TotalWeight = g.Sum(item => item.pd.pdscom ?? 0)
+            })
+            .Where(x => x.TotalWeight > 0)
+            .ToListAsync();
+
+        // --- MODIFICATION START ---
+        var groupedData = flatData
+            .GroupBy(x => x.DestinationName)
+            // 1. Create an intermediate object with the total weight for sorting
+            .Select(g => new {
+                DestinationName = g.Key,
+                Items = g.ToList(),
+                TotalWeightForDestination = g.Sum(item => item.TotalWeight)
+            })
+            // 2. Order by the calculated total weight in descending order
+            .OrderByDescending(x => x.TotalWeightForDestination)
+            // 3. Select the final object shape
+            .Select(g =>
+            {
+                var resultObject = new Dictionary<string, object> { ["name"] = g.DestinationName };
+                foreach (var item in g.Items)
+                {
+                    resultObject[item.VarieteName] = item.TotalWeight;
+                }
+                return resultObject;
+            })
+            .ToList();
+        // --- MODIFICATION END ---
+
+        var allVarietes = flatData.Select(x => x.VarieteName).Distinct().ToList();
+
+        return Ok(new { data = groupedData, keys = allVarietes });
+    }
 
 
 
