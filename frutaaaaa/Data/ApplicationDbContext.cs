@@ -26,6 +26,9 @@ namespace frutaaaaa.Data
         public DbSet<ViewExpVerVar> ViewExpVerVars { get; set; }
         public DbSet<Bdq> Bdqs { get; set; }
         public DbSet<Dossier> Dossiers { get; set; }
+        public DbSet<TypeEcart> TypeEcarts { get; set; }
+        public DbSet<EcartD> EcartDs { get; set; }
+        public DbSet<Entreprise> Entreprises { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -38,7 +41,21 @@ namespace frutaaaaa.Data
             modelBuilder.Entity<Partenaire>().ToTable("partenaire").HasNoKey();
             modelBuilder.Entity<GrpVar>().ToTable("grpvar").HasNoKey();
             modelBuilder.Entity<TPalette>().ToTable("tpalette").HasNoKey();
-
+            modelBuilder.Entity<Entreprise>(eb =>
+            {
+                eb.ToTable("entreprise");
+                eb.HasKey(e => e.refent); // Set the primary key
+            });
+            modelBuilder.Entity<EcartD>(eb =>
+            {
+                eb.ToTable("ecart_d");
+                eb.HasKey(e => e.numpre); // Set the primary key
+            });
+            modelBuilder.Entity<TypeEcart>(eb =>
+            {
+                eb.ToTable("typeecart");
+                eb.HasKey(t => t.codtype); // Set the primary key
+            });
             // --- THIS IS THE CORRECTED SECTION ---
             modelBuilder.Entity<Verger>(eb =>
             {
