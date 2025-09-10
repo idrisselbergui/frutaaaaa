@@ -2,6 +2,7 @@
 using frutaaaaa.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration; // 1. Add this
 
 namespace frutaaaaa.Controllers
 {
@@ -9,139 +10,162 @@ namespace frutaaaaa.Controllers
     [ApiController]
     public class DailyProgramController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration; // 2. Change DbContext to IConfiguration
 
-        public DailyProgramController(ApplicationDbContext context)
+        public DailyProgramController(IConfiguration configuration) // 3. Update constructor
         {
-            _context = context;
+            _configuration = configuration;
         }
-        
-        // 1. GET: api/dailyprogram/dates
-        // This method returns a sorted list of unique dates that have programs.
+
+        // 4. Add the helper method
+        [NonAction]
+        public ApplicationDbContext CreateDbContext(string dbName)
+        {
+            var baseConnectionString = _configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrEmpty(dbName) || string.IsNullOrEmpty(baseConnectionString))
+            {
+                throw new ArgumentException("Database name or connection string is missing.");
+            }
+            var dynamicConnectionString = baseConnectionString.Replace("frutaaaaa_db", dbName);
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseMySql(dynamicConnectionString, ServerVersion.AutoDetect(dynamicConnectionString));
+            return new ApplicationDbContext(optionsBuilder.Options);
+        }
+
+        // --- 5. Update all methods to use the header and the helper ---
+
         [HttpGet("dates")]
-        public async Task<ActionResult<IEnumerable<string>>> GetProgramDates()
+        public async Task<ActionResult<IEnumerable<string>>> GetProgramDates([FromHeader(Name = "X-Database-Name")] string database)
         {
-            var dates = await _context.DailyPrograms
-                .OrderByDescending(p => p.Dteprog)
-                .Select(p => p.Dteprog.ToString("yyyy-MM-dd"))
-                .Distinct()
-                .ToListAsync();
-            return dates;
+            using (var _context = CreateDbContext(database))
+            {
+                var dates = await _context.DailyPrograms
+                    .OrderByDescending(p => p.Dteprog)
+                    .Select(p => p.Dteprog.ToString("yyyy-MM-dd"))
+                    .Distinct()
+                    .ToListAsync();
+                return dates;
+            }
         }
 
-        // 2. GET: api/dailyprogram?date=YYYY-MM-DD
-        // This gets programs for a single, specific date using the original DailyProgram model.
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<DailyProgram>>> GetDailyPrograms([FromQuery] string date)
+        public async Task<ActionResult<IEnumerable<DailyProgram>>> GetDailyPrograms(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            [FromQuery] string date)
         {
-            if (!DateTime.TryParse(date, out DateTime parsedDate))
+            using (var _context = CreateDbContext(database))
             {
-                return BadRequest("Invalid date format. Please use YYYY-MM-DD.");
-            }
-
-            var programs = await _context.DailyPrograms
-                .Include(p => p.Details) // We still include details for the edit form
-                .Where(p => p.Dteprog >= parsedDate.Date && p.Dteprog < parsedDate.Date.AddDays(1))
-                .OrderByDescending(p => p.Dteprog)
-                .ToListAsync();
-
-            return programs;
-        }
-
-        // GET: api/dailyprogram
-        // Gets all programs for the datagridview
-        //[HttpGet]
-        //public async Task<ActionResult<IEnumerable<DailyProgram>>> GetDailyPrograms()
-        //{
-        //    return await _context.DailyPrograms.ToListAsync();
-        //}
-
-        // GET: api/dailyprogram/5
-        // Gets a single program with its details to populate the form for editing
-        [HttpGet("{id}")]
-        public async Task<ActionResult<DailyProgram>> GetDailyProgram(int id)
-        {
-            var dailyProgram = await _context.DailyPrograms
-                .Include(p => p.Details) // Include the details
-                .FirstOrDefaultAsync(p => p.Id == id);
-
-            if (dailyProgram == null)
-            {
-                return NotFound();
-            }
-
-            return dailyProgram;
-        }
-
-        // POST: api/dailyprogram
-        // Creates a new program and its details
-        [HttpPost]
-        public async Task<ActionResult<DailyProgram>> PostDailyProgram(DailyProgram dailyProgram)
-        {
-            _context.DailyPrograms.Add(dailyProgram);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetDailyProgram), new { id = dailyProgram.Id }, dailyProgram);
-        }
-
-        // PUT: api/dailyprogram/5
-        // Updates a program and its details
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutDailyProgram(int id, DailyProgram dailyProgram)
-        {
-            if (id != dailyProgram.Id)
-            {
-                return BadRequest();
-            }
-
-            // Find existing details for this program to remove them
-            var existingDetails = _context.DailyProgramDetails
-                                          .Where(d => d.NumProg == dailyProgram.NumProg);
-            _context.DailyProgramDetails.RemoveRange(existingDetails);
-
-            // Add the new/updated details from the request
-            if (dailyProgram.Details != null && dailyProgram.Details.Any())
-            {
-                foreach (var detail in dailyProgram.Details)
+                if (!DateTime.TryParse(date, out DateTime parsedDate))
                 {
-                    _context.DailyProgramDetails.Add(detail);
+                    return BadRequest("Invalid date format. Please use YYYY-MM-DD.");
                 }
-            }
 
-            _context.Entry(dailyProgram).State = EntityState.Modified;
+                var programs = await _context.DailyPrograms
+                    .Include(p => p.Details)
+                    .Where(p => p.Dteprog >= parsedDate.Date && p.Dteprog < parsedDate.Date.AddDays(1))
+                    .OrderByDescending(p => p.Dteprog)
+                    .ToListAsync();
 
-            try
-            {
-                await _context.SaveChangesAsync();
+                return programs;
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.DailyPrograms.Any(e => e.Id == id)) { return NotFound(); }
-                else { throw; }
-            }
-
-            return NoContent();
         }
 
-        // DELETE: api/dailyprogram/5
-        // Deletes a program and its details
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteDailyProgram(int id)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<DailyProgram>> GetDailyProgram(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            int id)
         {
-            var dailyProgram = await _context.DailyPrograms
-                                             .Include(p => p.Details)
-                                             .FirstOrDefaultAsync(p => p.Id == id);
-            if (dailyProgram == null)
+            using (var _context = CreateDbContext(database))
             {
-                return NotFound();
+                var dailyProgram = await _context.DailyPrograms
+                    .Include(p => p.Details)
+                    .FirstOrDefaultAsync(p => p.Id == id);
+
+                if (dailyProgram == null)
+                {
+                    return NotFound();
+                }
+
+                return dailyProgram;
             }
-
-            _context.DailyPrograms.Remove(dailyProgram);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
         }
 
-       
+        [HttpPost]
+        public async Task<ActionResult<DailyProgram>> PostDailyProgram(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            DailyProgram dailyProgram)
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                _context.DailyPrograms.Add(dailyProgram);
+                await _context.SaveChangesAsync();
+
+                return CreatedAtAction(nameof(GetDailyProgram), new { id = dailyProgram.Id, database = database }, dailyProgram);
+            }
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutDailyProgram(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            int id,
+            DailyProgram dailyProgram)
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                if (id != dailyProgram.Id)
+                {
+                    return BadRequest();
+                }
+
+                var existingDetails = _context.DailyProgramDetails
+                                              .Where(d => d.NumProg == dailyProgram.NumProg);
+                _context.DailyProgramDetails.RemoveRange(existingDetails);
+
+                if (dailyProgram.Details != null && dailyProgram.Details.Any())
+                {
+                    foreach (var detail in dailyProgram.Details)
+                    {
+                        _context.DailyProgramDetails.Add(detail);
+                    }
+                }
+
+                _context.Entry(dailyProgram).State = EntityState.Modified;
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!_context.DailyPrograms.Any(e => e.Id == id)) { return NotFound(); }
+                    else { throw; }
+                }
+
+                return NoContent();
+            }
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteDailyProgram(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            int id)
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                var dailyProgram = await _context.DailyPrograms
+                                                 .Include(p => p.Details)
+                                                 .FirstOrDefaultAsync(p => p.Id == id);
+                if (dailyProgram == null)
+                {
+                    return NotFound();
+                }
+
+                _context.DailyPrograms.Remove(dailyProgram);
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+        }
     }
 }
+

@@ -20,7 +20,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173") // URL of your React app
+            policy.WithOrigins("https://fruta-six.vercel.app") // URL of your React apphttps://fruta-six.vercel.app",
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });

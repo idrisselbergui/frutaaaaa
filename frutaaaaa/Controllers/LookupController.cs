@@ -2,8 +2,9 @@
 using frutaaaaa.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration; // 1. Add this
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace frutaaaaa.Controllers
@@ -12,85 +13,118 @@ namespace frutaaaaa.Controllers
     [ApiController]
     public class LookupController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration; // 2. Change DbContext to IConfiguration
 
-        public LookupController(ApplicationDbContext context)
+        public LookupController(IConfiguration configuration) // 3. Update constructor
         {
-            _context = context;
+            _configuration = configuration;
         }
 
-        // --- UPDATED METHOD WITH ERROR HANDLING ---
-        [HttpGet("campagne-dates")]
-        public async Task<ActionResult<object>> GetCampagneDates()
+        // 4. Add the helper method
+        [NonAction]
+        public ApplicationDbContext CreateDbContext(string dbName)
         {
-            try
+            var baseConnectionString = _configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrEmpty(dbName) || string.IsNullOrEmpty(baseConnectionString))
             {
-                var dates = await _context.Entreprises
-                    .Select(e => new { e.dtDebut, e.dtFin })
-                    .FirstOrDefaultAsync();
-
-                if (dates == null)
-                {
-                    return NotFound("No entreprise record found.");
-                }
-
-                var startDate = dates.dtDebut ?? System.DateTime.MinValue;
-                var endDate = dates.dtFin ?? System.DateTime.UtcNow;
-
-                return Ok(new
-                {
-                    startDate = startDate,
-                    endDate = endDate
-                });
+                throw new ArgumentException("Database name or connection string is missing.");
             }
-            catch (System.Exception ex)
-            {
-                // This will return the specific database error to the browser console for debugging.
-                return StatusCode(500, $"An error occurred: {ex.Message} | Inner Exception: {ex.InnerException?.Message}");
-            }
+            var dynamicConnectionString = baseConnectionString.Replace("frutaaaaa_db", dbName);
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseMySql(dynamicConnectionString, ServerVersion.AutoDetect(dynamicConnectionString));
+            return new ApplicationDbContext(optionsBuilder.Options);
         }
 
-
-        [HttpGet("typeecarts")]
-        public async Task<ActionResult<IEnumerable<TypeEcart>>> GetTypeEcarts()
-        {
-            return await _context.TypeEcarts.ToListAsync();
-        }
+        // --- 5. Update all methods to use the header and the helper ---
 
         [HttpGet("destinations")]
-        public async Task<ActionResult<IEnumerable<Destination>>> GetDestinations()
+        public async Task<ActionResult<IEnumerable<Destination>>> GetDestinations([FromHeader(Name = "X-Database-Name")] string database)
         {
-            return await _context.Destinations.ToListAsync();
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.Destinations.ToListAsync();
+            }
         }
+
         [HttpGet("tpalettes")]
-        public async Task<ActionResult<IEnumerable<TPalette>>> GetTPalettes()
+        public async Task<ActionResult<IEnumerable<TPalette>>> GetTPalettes([FromHeader(Name = "X-Database-Name")] string database)
         {
-            return await _context.TPalettes.ToListAsync();
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.TPalettes.ToListAsync();
+            }
         }
 
         [HttpGet("partenaires/{type}")]
-        public async Task<ActionResult<IEnumerable<Partenaire>>> GetPartenaires(string type)
+        public async Task<ActionResult<IEnumerable<Partenaire>>> GetPartenaires([FromHeader(Name = "X-Database-Name")] string database, string type)
         {
-            return await _context.Partenaires
-                                 .Where(p => p.type == type)
-                                 .ToListAsync();
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.Partenaires
+                                     .Where(p => p.type == type)
+                                     .ToListAsync();
+            }
         }
 
         [HttpGet("grpvars")]
-        public async Task<ActionResult<IEnumerable<GrpVar>>> GetGrpVars()
+        public async Task<ActionResult<IEnumerable<GrpVar>>> GetGrpVars([FromHeader(Name = "X-Database-Name")] string database)
         {
-            return await _context.grpvars.ToListAsync();
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.grpvars.ToListAsync();
+            }
         }
+
         [HttpGet("varietes")]
-        public async Task<ActionResult<IEnumerable<Variete>>> GetVarietes()
+        public async Task<ActionResult<IEnumerable<Variete>>> GetVarietes([FromHeader(Name = "X-Database-Name")] string database)
         {
-            return await _context.Varietes.ToListAsync();
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.Varietes.ToListAsync();
+            }
         }
 
         [HttpGet("vergers")]
-        public async Task<ActionResult<IEnumerable<Verger>>> GetVergers()
+        public async Task<ActionResult<IEnumerable<Verger>>> GetVergers([FromHeader(Name = "X-Database-Name")] string database)
         {
-            return await _context.Vergers.ToListAsync();
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.Vergers.ToListAsync();
+            }
+        }
+
+        [HttpGet("typeecarts")]
+        public async Task<ActionResult<IEnumerable<TypeEcart>>> GetTypeEcarts([FromHeader(Name = "X-Database-Name")] string database)
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.TypeEcarts.ToListAsync();
+            }
+        }
+
+        [HttpGet("campagne-dates")]
+        public async Task<ActionResult<object>> GetCampagneDates([FromHeader(Name = "X-Database-Name")] string database)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    var result = await _context.Entreprises
+                        .Select(e => new { StartDate = e.dtDebut, EndDate = e.dtFin })
+                        .FirstOrDefaultAsync();
+
+                    if (result == null)
+                    {
+                        return NotFound("No campaign data found in the entreprise table.");
+                    }
+                    return Ok(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while fetching campaign dates: {ex.Message}");
+            }
         }
     }
 }
+

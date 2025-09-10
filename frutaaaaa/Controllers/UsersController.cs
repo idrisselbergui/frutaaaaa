@@ -2,6 +2,7 @@
 using frutaaaaa.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace frutaaaaa.Controllers
 {
@@ -9,47 +10,98 @@ namespace frutaaaaa.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public UsersController(ApplicationDbContext context)
+        public UsersController(IConfiguration configuration)
         {
-            _context = context;
+            _configuration = configuration;
+        }
+
+        [NonAction]
+        public ApplicationDbContext CreateDbContext(string dbName)
+        {
+            var baseConnectionString = _configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrEmpty(dbName) || string.IsNullOrEmpty(baseConnectionString))
+            {
+                throw new ArgumentException("Database name or connection string is missing.");
+            }
+            var dynamicConnectionString = baseConnectionString.Replace("frutaaaaa_db", dbName);
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseMySql(dynamicConnectionString, ServerVersion.AutoDetect(dynamicConnectionString));
+            return new ApplicationDbContext(optionsBuilder.Options);
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] UserRequest request)
+        public async Task<IActionResult> Register(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            [FromBody] UserRequest request)
         {
-            if (await _context.Users.AnyAsync(u => u.Username == request.Username))
+            try
             {
-                return BadRequest(new { message = "Username already exists" });
+                using (var _context = CreateDbContext(database))
+                {
+                    if (await _context.Users.AnyAsync(u => u.Username == request.Username))
+                    {
+                        return BadRequest(new { message = "Username already exists" });
+                    }
+
+                    var user = new User
+                    {
+                        Username = request.Username,
+                        Password = request.Password,
+                        Permission = request.Permission
+                    };
+
+                    _context.Users.Add(user);
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new { message = "User registered successfully" });
+                }
             }
-
-            var user = new User
+            catch (Exception ex)
             {
-                Username = request.Username,
-                Password = request.Password, // In a real app, this must be hashed.
-                Permission = request.Permission
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "User registered successfully" });
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UserRequest request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u =>
-                u.Username == request.Username &&
-                u.Password == request.Password);
-
-            if (user == null)
+            if (string.IsNullOrEmpty(request.Database))
             {
-                return Unauthorized(new { message = "Invalid credentials" });
+                return BadRequest(new { message = "Database name is required." });
             }
 
-            return Ok(new { message = "Login successful", userId = user.Id, permission = user.Permission });
+            try
+            {
+                using (var dynamicContext = CreateDbContext(request.Database))
+                {
+                    // This will now throw an exception if the database or table does not exist.
+                    var user = await dynamicContext.Users.FirstOrDefaultAsync(u =>
+                        u.Username == request.Username &&
+                        u.Password == request.Password);
+
+                    if (user == null)
+                    {
+                        return Unauthorized(new { message = "Invalid credentials for the specified database." });
+                    }
+
+                    return Ok(new
+                    {
+                        message = "Login successful",
+                        userId = user.Id,
+                        permission = user.Permission,
+                        database = request.Database
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // This catch block will now handle bad database names.
+                Console.WriteLine(ex.Message); // Log the real error for debugging.
+                return StatusCode(500, new { message = "Could not connect to the specified database. Please check the name and try again." });
+            }
         }
     }
 }
+
