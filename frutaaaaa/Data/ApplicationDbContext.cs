@@ -10,6 +10,8 @@ namespace frutaaaaa.Data
         }
 
         // DbSets
+        public DbSet<Trait> Traits { get; set; }
+        public DbSet<Traitement> Traitements { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<DailyProgram> DailyPrograms { get; set; }
         public DbSet<DailyProgramDetail> DailyProgramDetails { get; set; }
@@ -34,6 +36,10 @@ namespace frutaaaaa.Data
             base.OnModelCreating(modelBuilder);
 
             // Existing Configurations
+            modelBuilder.Entity<Trait>().HasKey(t => t.Ref);
+            modelBuilder.Entity<Traitement>().HasKey(t => t.Numtrait);
+
+
             modelBuilder.Entity<DailyProgramDetail>()
                 .HasKey(d => new { d.NumProg, d.codgrv });
 
