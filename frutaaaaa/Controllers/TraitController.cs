@@ -138,6 +138,16 @@ namespace frutaaaaa.Controllers
                         return NotFound();
                     }
 
+                    // --- BUSINESS RULE CHECK ---
+                    // Check if the Trait is being used in any Traitement records.
+                    var isInUse = await _context.Traitements.AnyAsync(t => t.Ref == id);
+                    if (isInUse)
+                    {
+                        // If it is in use, return a 400 Bad Request error with a clear message.
+                        return BadRequest(new { message = "This product cannot be deleted because it is used in one or more treatments." });
+                    }
+                    // --- END OF CHECK ---
+
                     _context.Traits.Remove(trait);
                     await _context.SaveChangesAsync();
 

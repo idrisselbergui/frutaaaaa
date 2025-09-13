@@ -19,7 +19,10 @@ namespace frutaaaaa.Models
         [Column("dar")]
         public int? Dar { get; set; }
 
-        [Column("codgrp")]
-        public int? Codgrp { get; set; }
+        [Column("dos")]
+        public double? Dos { get; set; }
+
+        [Column("unité")]
+        public string? Unite { get; set; }
     }
 }

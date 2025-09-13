@@ -31,6 +31,9 @@ namespace frutaaaaa.Data
         public DbSet<TypeEcart> TypeEcarts { get; set; }
         public DbSet<EcartD> EcartDs { get; set; }
         public DbSet<Entreprise> Entreprises { get; set; }
+        // --- NEW DbSet FOR RECEPTION ---
+        public DbSet<Reception> Receptions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -62,12 +65,20 @@ namespace frutaaaaa.Data
                 eb.ToTable("typeecart");
                 eb.HasKey(t => t.codtype); // Set the primary key
             });
+            // --- NEW CONFIGURATION FOR RECEPTION ---
+            modelBuilder.Entity<Reception>(eb =>
+            {
+                eb.ToTable("reception");
+                eb.HasKey(r => r.Numrec);
+            });
+            // --- END NEW CONFIGURATION ---
+
             // --- THIS IS THE CORRECTED SECTION ---
             modelBuilder.Entity<Verger>(eb =>
             {
                 eb.ToTable("verger");
                 eb.HasNoKey();
-             
+
             });
 
             modelBuilder.Entity<PalBrut>(eb =>
@@ -92,7 +103,7 @@ namespace frutaaaaa.Data
             {
                 eb.ToTable("variete");
                 eb.HasNoKey();
-              
+
             });
             modelBuilder.Entity<EcartE>(eb =>
             {

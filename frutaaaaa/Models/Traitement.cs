@@ -17,6 +17,11 @@ namespace frutaaaaa.Models
         [Column("ref")]
         public int? Ref { get; set; }
 
+        [Column("codgrp")]
+        public int? Codgrp { get; set; }
+        [Column("codvar")]
+        public int? Codvar { get; set; }
+
         [Column("dateappli")]
         public DateTime? Dateappli { get; set; }
 
