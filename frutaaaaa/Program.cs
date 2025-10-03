@@ -16,7 +16,8 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins(
                 "http://localhost:5173",       // React Dev
-                "https://fruta-six.vercel.app" // React on Vercel
+                "https://fruta-six.vercel.app", // React on Vercel
+                "https://scandic-hermine-snuffly.ngrok-free.dev" // ngrok address
             )
             .AllowAnyHeader()
             .AllowAnyMethod();
