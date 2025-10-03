@@ -1,50 +1,51 @@
-using frutaaaaa.Data; // Add this line
-using Microsoft.EntityFrameworkCore; // Add this line
-
-
+ï»¿using frutaaaaa.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
- 
 
-
-
-// --- START: Add this block of code ---
+// Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
-// --- END: Add this block of code ---ices to the container.
 
-
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173",       // Votre URL de développement
-                      "https://fruta-six.vercel.app") // URL of your React app;;; http://localhost:5173....https://fruta-six.vercel.app",
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
+            policy.WithOrigins(
+                "http://localhost:5173",       // React Dev
+                "https://fruta-six.vercel.app" // React on Vercel
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
         });
 });
 
+// Services
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var app = builder.Build(); 
+var app = builder.Build();
 
-
-
-
-// Configure the HTTP request pipeline.
+// Middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+  
+// IIS already handles HTTPS, no need to force port binding
+// Remove: app.Urls.Add("http://0.0.0.0:80");
 
-app.UseHttpsRedirection();
+app.UseHttpsRedirection(); // keep this: redirects http:// to https://
 
 app.UseCors("AllowReactApp");
 
