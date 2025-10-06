@@ -15,9 +15,11 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy.WithOrigins(
-                "http://localhost:5173",       // React Dev
-                "https://fruta-six.vercel.app", // React on Vercel
-                "https://fruta-api.ddnsfree.com" // ngrok address
+                "http://localhost:5173",
+                "https://fruta-six.vercel.app",
+                "https://fruta-api.ddnsfree.com", // Or your latest DDNS
+                " https://scandic-hermine-snuffly.ngrok-free.dev", // Or your latest DDNS
+                "https://fruta.accesscam.org"     // And this one too
             )
             .AllowAnyHeader()
             .AllowAnyMethod();
@@ -46,7 +48,7 @@ else
 // IIS already handles HTTPS, no need to force port binding
 // Remove: app.Urls.Add("http://0.0.0.0:80");
 
-app.UseHttpsRedirection(); // keep this: redirects http:// to https://
+//app.UseHttpsRedirection(); // keep this: redirects http:// to https://
 
 app.UseCors("AllowReactApp");
 
