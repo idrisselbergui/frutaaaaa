@@ -314,6 +314,230 @@ public class DashboardController : ControllerBase
         }
     }
 
+    [HttpGet("periodic-trends")]
+    public async Task<ActionResult<object>> GetPeriodicTrends(
+    [FromHeader(Name = "X-Database-Name")] string database,
+    [FromQuery] DateTime startDate,
+    [FromQuery] DateTime endDate,
+    [FromQuery] string chartType,
+    [FromQuery] string timePeriod,
+    [FromQuery] int vergerId,
+    [FromQuery] int? grpVarId,
+    [FromQuery] int? varieteId)
+    {
+        try
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                var endDateInclusive = endDate.Date.AddDays(1).AddTicks(-1);
+                var trendsData = new List<Dictionary<string, object>>();
+
+                if (chartType.ToLower() == "reception")
+                {
+                    var receptionQuery = _context.palbruts.AsQueryable()
+                        .Where(pb => pb.etat == "R"
+                            && pb.dterec >= startDate.Date
+                            && pb.dterec <= endDateInclusive
+                            && pb.refver == vergerId);
+
+                    // Apply variety group filter
+                    if (grpVarId.HasValue)
+                    {
+                        var varietiesInGroup = await _context.Varietes
+                            .Where(v => v.codgrv == grpVarId.Value)
+                            .Select(v => v.codvar)
+                            .ToListAsync();
+                        receptionQuery = receptionQuery.Where(pb => pb.codvar.HasValue && varietiesInGroup.Contains(pb.codvar.Value));
+                    }
+
+                    // Apply variety filter
+                    if (varieteId.HasValue)
+                    {
+                        receptionQuery = receptionQuery.Where(pb => pb.codvar == varieteId.Value);
+                    }
+
+                    var data = await receptionQuery
+                        .Select(pb => new { Date = pb.dterec, Value = pb.pdsfru ?? 0 })
+                        .ToListAsync();
+
+                    trendsData = GroupByTimePeriod(data, timePeriod, startDate, endDate);
+                }
+                else if (chartType.ToLower() == "export")
+                {
+                    var exportQuery = _context.Palette_ds.AsQueryable()
+                        .Join(_context.Palettes,
+                              pd => pd.numpal,
+                              p => p.numpal,
+                              (pd, p) => new { PaletteD = pd, Palette = p })
+                        .Where(x => x.Palette.dtepal >= startDate.Date
+                            && x.Palette.dtepal <= endDateInclusive
+                            && x.PaletteD.refver == vergerId);
+
+                    // Apply variety group filter
+                    if (grpVarId.HasValue)
+                    {
+                        var varietiesInGroup = await _context.Varietes
+                            .Where(v => v.codgrv == grpVarId.Value)
+                            .Select(v => v.codvar)
+                            .ToListAsync();
+                        exportQuery = exportQuery.Where(x => x.PaletteD.codvar.HasValue && varietiesInGroup.Contains(x.PaletteD.codvar.Value));
+                    }
+
+                    // Apply variety filter
+                    if (varieteId.HasValue)
+                    {
+                        exportQuery = exportQuery.Where(x => x.PaletteD.codvar == varieteId.Value);
+                    }
+
+                    var data = await exportQuery
+                        .Select(x => new { Date = x.Palette.dtepal, Value = x.PaletteD.pdscom ?? 0 })
+                        .ToListAsync();
+
+                    trendsData = GroupByTimePeriod(data, timePeriod, startDate, endDate);
+                }
+                else if (chartType.ToLower() == "ecart")
+                {
+                    var ecartQuery = _context.EcartEs.AsQueryable()
+                        .Where(e => e.dtepal >= startDate.Date
+                            && e.dtepal <= endDateInclusive
+                            && e.refver == vergerId);
+
+                    // Apply variety group filter
+                    if (grpVarId.HasValue)
+                    {
+                        var varietiesInGroup = await _context.Varietes
+                            .Where(v => v.codgrv == grpVarId.Value)
+                            .Select(v => v.codvar)
+                            .ToListAsync();
+                        ecartQuery = ecartQuery.Where(e => varietiesInGroup.Contains(e.codvar));
+                    }
+
+                    // Apply variety filter
+                    if (varieteId.HasValue)
+                    {
+                        ecartQuery = ecartQuery.Where(e => e.codvar == varieteId.Value);
+                    }
+
+                    var data = await ecartQuery
+                        .Select(e => new { Date = e.dtepal, Value = e.pdsfru })
+                        .ToListAsync();
+
+                    trendsData = GroupByTimePeriod(data, timePeriod, startDate, endDate);
+                }
+
+                return Ok(new { trends = trendsData, chartType, timePeriod });
+            }
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"An error occurred: {ex.Message}");
+        }
+    }
+
+
+
+    [NonAction]
+    private List<Dictionary<string, object>> GroupByTimePeriod(
+    IEnumerable<dynamic> data,
+    string timePeriod,
+    DateTime startDate,
+    DateTime endDate)
+    {
+        var groupedData = new List<Dictionary<string, object>>();
+
+        switch (timePeriod.ToLower())
+        {
+
+            // Fix the date format for JavaScript compatibility
+            case "daily":
+                groupedData = data.GroupBy(d => d.Date.Date)
+                    .OrderBy(g => g.Key)
+                    .Select(g => new Dictionary<string, object>
+                    {
+                        ["date"] = g.Key.ToString("yyyy-MM-dd"), // Always ISO format for JS
+                        ["value"] = g.Sum(d => (decimal)d.Value),
+                        ["label"] = g.Key.ToString("dd/MM/yyyy") // Always include year
+                    }).ToList();
+                break;
+
+
+            case "monthly":
+                groupedData = data.GroupBy(d => new DateTime(d.Date.Year, d.Date.Month, 1))
+                    .OrderBy(g => g.Key)
+                    .Select(g => new Dictionary<string, object>
+                    {
+                        ["date"] = g.Key.ToString("yyyy-MM-01"), // First day of month
+                        ["value"] = g.Sum(d => (decimal)d.Value),
+                        ["label"] = g.Key.ToString("MM/yyyy")
+                    }).ToList();
+                break;
+
+            case "weekly":
+                groupedData = data.GroupBy(d => {
+                    var date = d.Date.Date;
+                    int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+                    return date.AddDays(-1 * diff);
+                })
+                .OrderBy(g => g.Key)
+                .Select(g => new Dictionary<string, object>
+                {
+                    ["date"] = g.Key.ToString("yyyy-MM-dd"),
+                    ["value"] = g.Sum(d => (decimal)d.Value),
+                    ["label"] = $"Week of {g.Key.ToString("dd/MM/yyyy")}"
+                }).ToList();
+                break;
+
+            case "biweekly":
+                groupedData = data.GroupBy(d => {
+                    var date = d.Date.Date;
+                    var dayOfMonth = date.Day;
+
+                    // First half: 1st-15th, Second half: 16th-End of month
+                    if (dayOfMonth <= 15)
+                    {
+                        // First half of month: 1st-15th
+                        return new DateTime(date.Year, date.Month, 1);
+                    }
+                    else
+                    {
+                        // Second half of month: 16th-End
+                        return new DateTime(date.Year, date.Month, 16);
+                    }
+                })
+                .OrderBy(g => g.Key)
+                .Select(g => {
+                    var firstDate = g.Key;
+                    var isFirstHalf = firstDate.Day == 1;
+                    var monthName = firstDate.ToString("MM/yyyy");
+
+                    return new Dictionary<string, object>
+                    {
+                        ["date"] = firstDate.ToString("yyyy-MM-dd"),
+                        ["value"] = g.Sum(d => (decimal)d.Value),
+                        ["label"] = isFirstHalf ? $"1-15 {monthName}" : $"16-End {monthName}"
+                    };
+                }).ToList();
+                break;
+
+
+            
+
+            case "yearly":
+                groupedData = data.GroupBy(d => new DateTime(d.Date.Year, 1, 1))
+                    .OrderBy(g => g.Key)
+                    .Select(g => new Dictionary<string, object>
+                    {
+                        ["date"] = g.Key.ToString("yyyy-MM-dd"),
+                        ["value"] = g.Sum(d => (decimal)d.Value),
+                        ["label"] = g.Key.Year.ToString()
+                    }).ToList();
+                break;
+        }
+
+        return groupedData;
+    }
+
+
     [HttpGet("ecart-details")]
     public async Task<ActionResult<EcartDetailsResponseDto>> GetEcartDetails(
         [FromHeader(Name = "X-Database-Name")] string database,
