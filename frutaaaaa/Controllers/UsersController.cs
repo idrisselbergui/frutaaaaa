@@ -63,6 +63,49 @@ namespace frutaaaaa.Controllers
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+        // GET: api/users - List all users
+        [HttpGet]
+        public async Task<IActionResult> GetUsers()
+        {
+            using (var _context = CreateDbContext(Request.Headers["X-Database-Name"].ToString()))
+            {
+                var users = await _context.Users.ToListAsync();
+                return Ok(users);
+            }
+        }
+
+        // PUT: api/users/{id} - Update user
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UserRequest request)
+        {
+            using (var _context = CreateDbContext(Request.Headers["X-Database-Name"].ToString()))
+            {
+                var user = await _context.Users.FindAsync(id);
+                if (user == null) return NotFound();
+
+                user.Username = request.Username;
+                user.Password = request.Password;
+                user.Permission = request.Permission;
+
+                await _context.SaveChangesAsync();
+                return Ok(user);
+            }
+        }
+
+        // DELETE: api/users/{id} - Delete user
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            using (var _context = CreateDbContext(Request.Headers["X-Database-Name"].ToString()))
+            {
+                var user = await _context.Users.FindAsync(id);
+                if (user == null) return NotFound();
+
+                _context.Users.Remove(user);
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+        }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UserRequest request)
