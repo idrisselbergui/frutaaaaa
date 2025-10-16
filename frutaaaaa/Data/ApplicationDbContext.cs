@@ -31,17 +31,32 @@ namespace frutaaaaa.Data
         public DbSet<TypeEcart> TypeEcarts { get; set; }
         public DbSet<EcartD> EcartDs { get; set; }
         public DbSet<Entreprise> Entreprises { get; set; }
-        // --- NEW DbSet FOR RECEPTION ---
         public DbSet<Reception> Receptions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Existing Configurations
-            modelBuilder.Entity<Trait>().HasKey(t => t.Ref);
-            modelBuilder.Entity<Traitement>().HasKey(t => t.Numtrait);
+            // Configure Trait entity with UTF-8 character set for special characters
+            modelBuilder.Entity<Trait>(entity =>
+            {
+                entity.HasKey(t => t.Ref);
 
+                // Configure string columns to use utf8mb4 character set
+                entity.Property(t => t.Nomcom)
+                    .HasCharSet("utf8mb4")
+                    .HasCollation("utf8mb4_unicode_ci");
+
+                entity.Property(t => t.Matieractive)
+                    .HasCharSet("utf8mb4")
+                    .HasCollation("utf8mb4_unicode_ci");
+
+                entity.Property(t => t.Unite)
+                    .HasCharSet("utf8mb4")
+                    .HasCollation("utf8mb4_unicode_ci");
+            });
+
+            modelBuilder.Entity<Traitement>().HasKey(t => t.Numtrait);
 
             modelBuilder.Entity<DailyProgramDetail>()
                 .HasKey(d => new { d.NumProg, d.codgrv });
@@ -50,35 +65,35 @@ namespace frutaaaaa.Data
             modelBuilder.Entity<Partenaire>().ToTable("partenaire").HasNoKey();
             modelBuilder.Entity<GrpVar>().ToTable("grpvar").HasNoKey();
             modelBuilder.Entity<TPalette>().ToTable("tpalette").HasNoKey();
+
             modelBuilder.Entity<Entreprise>(eb =>
             {
                 eb.ToTable("entreprise");
-                eb.HasKey(e => e.refent); // Set the primary key
+                eb.HasKey(e => e.refent);
             });
+
             modelBuilder.Entity<EcartD>(eb =>
             {
                 eb.ToTable("ecart_d");
-                eb.HasKey(e => e.numpre); // Set the primary key
+                eb.HasKey(e => e.numpre);
             });
+
             modelBuilder.Entity<TypeEcart>(eb =>
             {
                 eb.ToTable("typeecart");
-                eb.HasKey(t => t.codtype); // Set the primary key
+                eb.HasKey(t => t.codtype);
             });
-            // --- NEW CONFIGURATION FOR RECEPTION ---
+
             modelBuilder.Entity<Reception>(eb =>
             {
                 eb.ToTable("reception");
                 eb.HasKey(r => r.Numrec);
             });
-            // --- END NEW CONFIGURATION ---
 
-            // --- THIS IS THE CORRECTED SECTION ---
             modelBuilder.Entity<Verger>(eb =>
             {
                 eb.ToTable("verger");
                 eb.HasNoKey();
-
             });
 
             modelBuilder.Entity<PalBrut>(eb =>
@@ -103,20 +118,21 @@ namespace frutaaaaa.Data
             {
                 eb.ToTable("variete");
                 eb.HasNoKey();
-
             });
+
             modelBuilder.Entity<EcartE>(eb =>
             {
                 eb.ToTable("ecart_e");
-                eb.HasNoKey(); // As requested, this is a keyless entity for viewing data
+                eb.HasNoKey();
             });
+
             modelBuilder.Entity<ViewExpVerVar>(eb =>
             {
-                eb.ToView("view_expvervar"); // Indique à EF que c'est une vue
+                eb.ToView("view_expvervar");
                 eb.HasNoKey();
-                // Mapper la colonne SUM
                 eb.Property(v => v.pdscom).HasColumnName("SUM(p.pdscom)");
             });
+
             modelBuilder.Entity<Bdq>(eb =>
             {
                 eb.ToTable("bdq");
@@ -128,9 +144,6 @@ namespace frutaaaaa.Data
                 eb.ToTable("dossier");
                 eb.HasNoKey();
             });
-
-
-
         }
     }
 }
