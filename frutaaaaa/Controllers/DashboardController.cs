@@ -520,7 +520,6 @@ public class DashboardController : ControllerBase
                 break;
 
 
-            
 
             case "yearly":
                 groupedData = data.GroupBy(d => new DateTime(d.Date.Year, 1, 1))
@@ -615,6 +614,102 @@ public class DashboardController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, $"An error occurred: {ex.Message}");
+        }
+    }
+
+    // --- REFACTORED AND EFFICIENT METHOD ---
+    [HttpGet("data-grouped-by-variety-group")]
+    public async Task<ActionResult<object>> GetDashboardDataGroupedByVarietyGroup(
+    [FromHeader(Name = "X-Database-Name")] string database,
+    [FromQuery] DateTime startDate,
+    [FromQuery] DateTime endDate,
+    [FromQuery] int? vergerId,
+    [FromQuery] int? grpVarId,
+    [FromQuery] int? varieteId)
+    {
+        try
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                var endDateInclusive = endDate.Date.AddDays(1).AddTicks(-1);
+
+                // Base query for reception
+                var receptionQuery = _context.palbruts
+                    .Where(p => p.etat == "R" && p.dterec >= startDate.Date && p.dterec <= endDateInclusive);
+
+                // Base query for export
+                var exportQuery = _context.Palette_ds
+                    .Join(_context.Palettes, pd => pd.numpal, p => p.numpal, (pd, p) => new { pd, p })
+                    .Where(x => x.p.dtepal >= startDate.Date && x.p.dtepal <= endDateInclusive);
+
+                // Base query for ecart
+                var ecartQuery = _context.EcartEs
+                    .Where(e => e.dtepal >= startDate.Date && e.dtepal <= endDateInclusive);
+
+                // Apply optional filters
+                if (vergerId.HasValue)
+                {
+                    receptionQuery = receptionQuery.Where(p => p.refver == vergerId.Value);
+                    exportQuery = exportQuery.Where(x => x.pd.refver == vergerId.Value);
+                    ecartQuery = ecartQuery.Where(e => e.refver == vergerId.Value);
+                }
+
+                if (varieteId.HasValue)
+                {
+                    receptionQuery = receptionQuery.Where(p => p.codvar == varieteId.Value);
+                    exportQuery = exportQuery.Where(x => x.pd.codvar == varieteId.Value);
+                    ecartQuery = ecartQuery.Where(e => e.codvar == varieteId.Value);
+                }
+                else if (grpVarId.HasValue)
+                {
+                    var varietiesInGroup = _context.Varietes.Where(v => v.codgrv == grpVarId.Value).Select(v => v.codvar);
+                    receptionQuery = receptionQuery.Where(p => p.codvar.HasValue && varietiesInGroup.Contains(p.codvar.Value));
+                    exportQuery = exportQuery.Where(x => x.pd.codvar.HasValue && varietiesInGroup.Contains(x.pd.codvar.Value));
+                    ecartQuery = ecartQuery.Where(e => varietiesInGroup.Contains(e.codvar));
+                }
+
+                // --- FIX: CAST TO DECIMAL EARLY ---
+                var receptionData = receptionQuery
+                    .Join(_context.Varietes, p => p.codvar, v => v.codvar, (p, v) => new { p.refver, v.codgrv, pdsfru = (decimal)(p.pdsfru ?? 0.0), pdscom = 0.0m, ecart = 0.0m });
+
+                var exportData = exportQuery
+                    .Join(_context.Varietes, x => x.pd.codvar, v => v.codvar, (x, v) => new { x.pd.refver, v.codgrv, pdsfru = 0.0m, pdscom = x.pd.pdscom ?? 0.0m, ecart = 0.0m });
+
+                var ecartData = ecartQuery
+                    .Join(_context.Varietes, e => e.codvar, v => v.codvar, (e, v) => new { e.refver, v.codgrv, pdsfru = 0.0m, pdscom = 0.0m, ecart = (decimal)e.pdsfru });
+
+                var allData = receptionData.Concat(exportData).Concat(ecartData);
+
+                // Perform the final grouping and summation in the database
+                var groupedResult = await allData
+                    .GroupBy(x => new { x.refver, x.codgrv })
+                    .Select(g => new
+                    {
+                        VergerId = g.Key.refver,
+                        GroupId = g.Key.codgrv,
+                        TotalPdsfru = g.Sum(x => x.pdsfru),
+                        TotalPdscom = g.Sum(x => x.pdscom),
+                        TotalEcart = g.Sum(x => x.ecart)
+                    })
+                    .Join(_context.Vergers, res => res.VergerId, verger => verger.refver, (res, verger) => new { res, verger })
+                    .Join(_context.grpvars, res_verger => res_verger.res.GroupId, grp => grp.codgrv, (res_verger, grp) => new GroupVarietyTableRowDto
+                    {
+                        VergerName = res_verger.verger.nomver,
+                        GroupVarieteName = grp.nomgrv,
+                        TotalPdsfru = res_verger.res.TotalPdsfru,
+                        TotalPdscom = res_verger.res.TotalPdscom,
+                        TotalEcart = res_verger.res.TotalEcart
+                    })
+                    .OrderBy(x => x.VergerName)
+                    .ThenBy(x => x.GroupVarieteName)
+                    .ToListAsync();
+
+                return Ok(new GroupedDashboardDataDto { TableRows = groupedResult });
+            }
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"An error occurred: {ex.Message} -> {ex.InnerException?.Message}");
         }
     }
 }
