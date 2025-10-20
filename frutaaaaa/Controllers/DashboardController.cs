@@ -616,6 +616,84 @@ public class DashboardController : ControllerBase
             return StatusCode(500, $"An error occurred: {ex.Message}");
         }
     }
+    [HttpGet("ecart-details-grouped")]
+    public async Task<ActionResult<EcartGroupDetailsResponseDto>> GetEcartDetailsGrouped(
+    [FromHeader(Name = "X-Database-Name")] string database,
+    [FromQuery] DateTime startDate,
+    [FromQuery] DateTime endDate,
+    [FromQuery] int? vergerId,
+    [FromQuery] int? grpVarId,
+    [FromQuery] int? varieteId,
+    [FromQuery] int? ecartTypeId)
+    {
+        try
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                var endDateInclusive = endDate.Date.AddDays(1).AddTicks(-1);
+
+                var query = from d in _context.EcartDs
+                            join e in _context.EcartEs on d.numpal equals e.numpal
+                            where e.dtepal >= startDate.Date && e.dtepal <= endDateInclusive
+                            select new { d, e };
+
+                if (vergerId.HasValue)
+                {
+                    query = query.Where(x => x.e.refver == vergerId.Value);
+                }
+
+                if (grpVarId.HasValue)
+                {
+                    var varietiesInGroup = await _context.Varietes
+                        .Where(v => v.codgrv == grpVarId.Value)
+                        .Select(v => v.codvar)
+                        .ToListAsync();
+                    query = query.Where(x => varietiesInGroup.Contains(x.e.codvar));
+                }
+
+                if (varieteId.HasValue)
+                {
+                    query = query.Where(x => x.e.codvar == varieteId.Value);
+                }
+                if (ecartTypeId.HasValue)
+                {
+                    query = query.Where(x => x.d.codtype == ecartTypeId.Value);
+                }
+
+                var result = await (
+                    from q in query
+                    join v in _context.Varietes on q.e.codvar equals v.codvar
+                    join grp in _context.grpvars on v.codgrv equals grp.codgrv
+                    join t in _context.TypeEcarts on q.d.codtype equals t.codtype
+                    join g in _context.Vergers on q.e.refver equals g.refver into vergerJoin
+                    from g in vergerJoin.DefaultIfEmpty()
+                    group new { q.d, q.e } by new { VergerName = g.nomver, GroupName = grp.nomgrv, EcartType = t.destype } into grouped
+                    select new EcartGroupDetailsDto
+                    {
+                        VergerName = grouped.Key.VergerName ?? "N/A",
+                        GroupVarieteName = grouped.Key.GroupName,
+                        EcartType = grouped.Key.EcartType,
+                        TotalPdsfru = (double)grouped.Sum(x => x.d.pdsfru),
+                        TotalNbrcai = grouped.Sum(x => x.d.nbrcai)
+                    }
+                ).ToListAsync();
+
+                var total = result.Sum(r => r.TotalPdsfru);
+
+                var response = new EcartGroupDetailsResponseDto
+                {
+                    Data = result,
+                    TotalPdsfru = total
+                };
+
+                return Ok(response);
+            }
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"An error occurred: {ex.Message}");
+        }
+    }
 
     // --- REFACTORED AND EFFICIENT METHOD ---
     [HttpGet("data-grouped-by-variety-group")]
