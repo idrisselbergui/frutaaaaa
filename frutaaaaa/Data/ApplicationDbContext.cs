@@ -10,6 +10,8 @@ namespace frutaaaaa.Data
         }
 
         // DbSets
+        public DbSet<EcartDirect> EcartDirects { get; set; }
+
         public DbSet<Trait> Traits { get; set; }
         public DbSet<Traitement> Traitements { get; set; }
         public DbSet<User> Users { get; set; }
@@ -55,6 +57,21 @@ namespace frutaaaaa.Data
                     .HasCharSet("utf8mb4")
                     .HasCollation("utf8mb4_unicode_ci");
             });
+            modelBuilder.Entity<EcartDirect>(eb =>
+            {
+                eb.ToTable("ecart_direct");
+                eb.HasKey(e => e.Numpal);
+                eb.Property(e => e.Numpal).ValueGeneratedOnAdd();
+                eb.Property(e => e.Pdsfru).HasColumnType("DOUBLE");
+
+                // New relationship
+                eb.HasOne(e => e.TypeEcart)
+                  .WithMany()
+                  .HasForeignKey(e => e.Codtype)
+                  .OnDelete(DeleteBehavior.SetNull);
+            });
+
+
 
             modelBuilder.Entity<Traitement>().HasKey(t => t.Numtrait);
 
