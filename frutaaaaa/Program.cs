@@ -16,6 +16,7 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins(
                 "http://localhost:5173",
+                "http://localhost:5174",
                 "https://fruta-six.vercel.app",
                 "https://fruta-api.ddnsfree.com", // Or your latest DDNS
                 " https://scandic-hermine-snuffly.ngrok-free.dev", // Or your latest DDNS

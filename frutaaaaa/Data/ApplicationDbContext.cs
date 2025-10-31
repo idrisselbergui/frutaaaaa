@@ -11,6 +11,8 @@ namespace frutaaaaa.Data
 
         // DbSets
         public DbSet<EcartDirect> EcartDirects { get; set; }
+        // Add this to your DbContext class:
+        public DbSet<UserPagePermission> UserPagePermissions { get; set; }
 
         public DbSet<Trait> Traits { get; set; }
         public DbSet<Traitement> Traitements { get; set; }
@@ -57,6 +59,10 @@ namespace frutaaaaa.Data
                     .HasCharSet("utf8mb4")
                     .HasCollation("utf8mb4_unicode_ci");
             });
+
+            modelBuilder.Entity<UserPagePermission>()
+           .HasKey(x => new { x.UserId, x.PageName });
+
             modelBuilder.Entity<EcartDirect>(eb =>
             {
                 eb.ToTable("ecart_direct");
