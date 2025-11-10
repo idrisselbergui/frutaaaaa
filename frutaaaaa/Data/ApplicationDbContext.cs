@@ -8,6 +8,7 @@ namespace frutaaaaa.Data
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
         }
+        public DbSet<Defaut> Defauts { get; set; }
 
         // DbSets
         public DbSet<EcartDirect> EcartDirects { get; set; }
@@ -58,6 +59,15 @@ namespace frutaaaaa.Data
                 entity.Property(t => t.Unite)
                     .HasCharSet("utf8mb4")
                     .HasCollation("utf8mb4_unicode_ci");
+            });
+            // In your DbContext OnModelCreating method
+            modelBuilder.Entity<Defaut>(entity =>
+            {
+                entity.ToTable("defaut");
+                entity.HasKey(e => e.Coddef);
+                entity.Property(e => e.Coddef).HasColumnName("coddef");
+                entity.Property(e => e.Intdef).HasColumnName("intdef");
+                entity.Property(e => e.Famdef).HasColumnName("famdef");
             });
 
             modelBuilder.Entity<UserPagePermission>()
