@@ -7,5 +7,7 @@
         public decimal TotalPdscom { get; set; }
         public double TotalPdsfru { get; set; }
         public double TotalEcart { get; set; }
+        public DateTime? MinReceptionDate { get; set; }
+        public DateTime? MaxExportDate { get; set; }
     }
 }
