@@ -96,6 +96,23 @@ namespace frutaaaaa.Controllers
             }
         }
 
+        // GET: api/vente-ecart
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Vente>>> GetVentes([FromHeader(Name = "X-Database-Name")] string database)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    return await _context.Ventes.Where(v => v.Date != null).OrderByDescending(v => v.Date).ToListAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
         // POST: api/vente-ecart
         [HttpPost]
         public async Task<IActionResult> CreateVenteEcart([FromHeader(Name = "X-Database-Name")] string database, [FromBody] VenteEcartRequest request)
@@ -162,6 +179,85 @@ namespace frutaaaaa.Controllers
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+
+        // PUT: api/vente-ecart/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateVente([FromHeader(Name = "X-Database-Name")] string database, int id, [FromBody] VenteUpdateRequest request)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    var vente = await _context.Ventes.FindAsync(id);
+                    if (vente == null) return NotFound();
+
+                    vente.Numbonvente = request.Numbonvente ?? vente.Numbonvente;
+                    vente.Date = request.Date ?? vente.Date;
+                    vente.Price = request.Price ?? vente.Price;
+                    vente.PoidsTotal = request.PoidsTotal ?? vente.PoidsTotal;
+                    vente.MontantTotal = request.MontantTotal ?? vente.MontantTotal;
+
+                    await _context.SaveChangesAsync();
+                    return Ok(new { message = "Vente updated successfully" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        // DELETE: api/vente-ecart/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteVente([FromHeader(Name = "X-Database-Name")] string database, int id)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    using (var transaction = await _context.Database.BeginTransactionAsync())
+                    {
+                        try
+                        {
+                            var vente = await _context.Ventes.FindAsync(id);
+                            if (vente == null) return NotFound();
+
+                            // Reset numvent on related ecarts
+                            var directEcarts = await _context.EcartDirects.Where(e => e.Numvent == id).ToListAsync();
+                            foreach (var ecart in directEcarts)
+                            {
+                                ecart.Numvent = null;
+                                ecart.Pdsvent = null;
+                                _context.Entry(ecart).State = EntityState.Modified;
+                            }
+
+                            var eEcarts = await _context.EcartEs.Where(e => e.numvent == id).ToListAsync();
+                            foreach (var ecart in eEcarts)
+                            {
+                                ecart.numvent = null;
+                                ecart.pdsvent = null;
+                                _context.Entry(ecart).State = EntityState.Modified;
+                            }
+
+                            _context.Ventes.Remove(vente);
+                            await _context.SaveChangesAsync();
+                            await transaction.CommitAsync();
+
+                            return Ok(new { message = "Vente deleted successfully" });
+                        }
+                        catch (Exception ex)
+                        {
+                            await transaction.RollbackAsync();
+                            throw ex;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
     }
 
     public class VenteEcartRequest
@@ -179,5 +275,14 @@ namespace frutaaaaa.Controllers
         public string Table { get; set; } // "ecart_direct" or "ecart_e"
         public int Id { get; set; } // Numpal for direct, numpal for E
         public double? Pdsvent { get; set; }
+    }
+
+    public class VenteUpdateRequest
+    {
+        public int? Numbonvente { get; set; }
+        public DateTime? Date { get; set; }
+        public double? Price { get; set; }
+        public double? PoidsTotal { get; set; }
+        public double? MontantTotal { get; set; }
     }
 }
