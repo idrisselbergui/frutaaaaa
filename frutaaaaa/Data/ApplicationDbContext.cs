@@ -37,7 +37,7 @@ namespace frutaaaaa.Data
         public DbSet<EcartD> EcartDs { get; set; }
         public DbSet<Entreprise> Entreprises { get; set; }
         public DbSet<Reception> Receptions { get; set; }
-
+        public DbSet<Vente> Ventes { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -73,21 +73,56 @@ namespace frutaaaaa.Data
             modelBuilder.Entity<UserPagePermission>()
            .HasKey(x => new { x.UserId, x.PageName });
 
+            //modelBuilder.Entity<EcartDirect>(eb =>
+            //{
+            //    eb.ToTable("ecart_direct");
+            //    eb.HasKey(e => e.Numpal);
+            //    eb.Property(e => e.Numpal).ValueGeneratedOnAdd();
+            //    eb.Property(e => e.Pdsfru).HasColumnType("DOUBLE");
+
+            //    // New relationship
+            //    eb.HasOne(e => e.TypeEcart)
+            //      .WithMany()
+            //      .HasForeignKey(e => e.Codtype)
+            //      .OnDelete(DeleteBehavior.SetNull);
+            //});
+
             modelBuilder.Entity<EcartDirect>(eb =>
             {
                 eb.ToTable("ecart_direct");
                 eb.HasKey(e => e.Numpal);
                 eb.Property(e => e.Numpal).ValueGeneratedOnAdd();
                 eb.Property(e => e.Pdsfru).HasColumnType("DOUBLE");
+                eb.Property(e => e.Numvent).HasColumnType("INT"); // Add this
+                eb.Property(e => e.Pdsvent).HasColumnType("DOUBLE"); // Add this
 
-                // New relationship
                 eb.HasOne(e => e.TypeEcart)
                   .WithMany()
                   .HasForeignKey(e => e.Codtype)
                   .OnDelete(DeleteBehavior.SetNull);
             });
 
+            // Update EcartE configuration in OnModelCreating:
+            modelBuilder.Entity<EcartE>(eb =>
+            {
+                eb.ToTable("ecart_e");
+                eb.HasKey(e => e.numpal);
+                eb.Property(e => e.numvent).HasColumnType("INT"); // Add this
+                eb.Property(e => e.pdsvent).HasColumnType("DOUBLE"); // Add this
+            });
 
+            // Add Vente configuration in OnModelCreating:
+            modelBuilder.Entity<Vente>(eb =>
+            {
+                eb.ToTable("vente");
+                eb.HasKey(e => e.Id);
+                eb.Property(e => e.Id).ValueGeneratedOnAdd();
+                eb.Property(e => e.Date).HasColumnType("DATE");
+                eb.Property(e => e.Price).HasColumnType("DOUBLE");
+                eb.Property(e => e.PoidsTotal).HasColumnType("DOUBLE");
+                eb.Property(e => e.MontantTotal).HasColumnType("DOUBLE");
+                eb.Property(e => e.CreatedAt).HasColumnType("DATETIME");
+            });
 
             modelBuilder.Entity<Traitement>().HasKey(t => t.Numtrait);
 
@@ -153,11 +188,11 @@ namespace frutaaaaa.Data
                 eb.HasNoKey();
             });
 
-            modelBuilder.Entity<EcartE>(eb =>
-            {
-                eb.ToTable("ecart_e");
-                eb.HasNoKey();
-            });
+            //modelBuilder.Entity<EcartE>(eb =>
+            //{
+            //    eb.ToTable("ecart_e");
+            //    eb.HasNoKey();
+            //});
 
             modelBuilder.Entity<ViewExpVerVar>(eb =>
             {

@@ -12,5 +12,9 @@ namespace frutaaaaa.Models
         public double pdspes { get; set; }
         public double pdsfru { get; set; }
         public int? refver { get; set; }
+
+        // Add these new properties
+        public int? numvent { get; set; }
+        public double? pdsvent { get; set; }
     }
 }

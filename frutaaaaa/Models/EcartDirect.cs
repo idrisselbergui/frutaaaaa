@@ -8,9 +8,11 @@
         public DateTime? Dtepal { get; set; }
         public int? Numbl { get; set; }
         public double? Pdsfru { get; set; }
-
-        // New field
         public int? Codtype { get; set; }
         public TypeEcart? TypeEcart { get; set; }
+
+        // Add these new properties
+        public int? Numvent { get; set; }
+        public double? Pdsvent { get; set; }
     }
 }
