@@ -134,7 +134,8 @@ namespace frutaaaaa.Controllers
                                 Date = request.Date,
                                 Price = request.Price,
                                 PoidsTotal = request.PoidsTotal,
-                                MontantTotal = request.MontantTotal
+                                MontantTotal = request.MontantTotal,
+                                Numlot = request.Numlot
                             };
                             _context.Ventes.Add(vente);
                             await _context.SaveChangesAsync();
@@ -277,6 +278,7 @@ namespace frutaaaaa.Controllers
                             vente.Price = request.Price;
                             vente.PoidsTotal = request.PoidsTotal;
                             vente.MontantTotal = request.MontantTotal;
+                            vente.Numlot = request.Numlot ?? vente.Numlot;
 
                             // Reset old ecarts
                             var directEcarts = await _context.EcartDirects.Where(e => e.Numvent == id).ToListAsync();
@@ -398,6 +400,7 @@ namespace frutaaaaa.Controllers
         public double Price { get; set; }
         public double PoidsTotal { get; set; }
         public double MontantTotal { get; set; }
+        public int? Numlot { get; set; }
         public List<SelectedEcart> SelectedEcarts { get; set; }
     }
 
