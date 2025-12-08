@@ -213,7 +213,8 @@ namespace frutaaaaa.Controllers
                             id = e.Numpal,
                             pdsvent = e.Pdsvent,
                             refver = e.Refver,
-                            codvar = e.Codvar
+                            codvar = e.Codvar,
+                            numbl = e.Numbl
                         })
                         .ToListAsync();
 
