@@ -389,7 +389,7 @@ public class DashboardController : ControllerBase
     [FromQuery] DateTime endDate,
     [FromQuery] string chartType,
     [FromQuery] string timePeriod,
-    [FromQuery] int vergerId,
+    [FromQuery] int? vergerId,
     [FromQuery] int? grpVarId,
     [FromQuery] int? varieteId)
     {
@@ -405,8 +405,12 @@ public class DashboardController : ControllerBase
                     var receptionQuery = _context.palbruts.AsQueryable()
                         .Where(pb => pb.etat == "R"
                             && pb.dterec >= startDate.Date
-                            && pb.dterec <= endDateInclusive
-                            && pb.refver == vergerId);
+                            && pb.dterec <= endDateInclusive);
+
+                    if (vergerId.HasValue)
+                    {
+                        receptionQuery = receptionQuery.Where(pb => pb.refver == vergerId.Value);
+                    }
 
                     // Apply variety group filter
                     if (grpVarId.HasValue)
@@ -438,8 +442,12 @@ public class DashboardController : ControllerBase
                               p => p.numpal,
                               (pd, p) => new { PaletteD = pd, Palette = p })
                         .Where(x => x.Palette.dtepal >= startDate.Date
-                            && x.Palette.dtepal <= endDateInclusive
-                            && x.PaletteD.refver == vergerId);
+                            && x.Palette.dtepal <= endDateInclusive);
+
+                    if (vergerId.HasValue)
+                    {
+                        exportQuery = exportQuery.Where(x => x.PaletteD.refver == vergerId.Value);
+                    }
 
                     // Apply variety group filter
                     if (grpVarId.HasValue)
@@ -467,8 +475,12 @@ public class DashboardController : ControllerBase
                 {
                     var ecartQuery = _context.EcartEs.AsQueryable()
                         .Where(e => e.dtepal >= startDate.Date
-                            && e.dtepal <= endDateInclusive
-                            && e.refver == vergerId);
+                            && e.dtepal <= endDateInclusive);
+
+                    if (vergerId.HasValue)
+                    {
+                        ecartQuery = ecartQuery.Where(e => e.refver == vergerId.Value);
+                    }
 
                     // Apply variety group filter
                     if (grpVarId.HasValue)
@@ -999,5 +1011,3 @@ public class DashboardController : ControllerBase
 
 
 }
-
-
