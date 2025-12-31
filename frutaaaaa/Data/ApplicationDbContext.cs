@@ -38,6 +38,8 @@ namespace frutaaaaa.Data
         public DbSet<Entreprise> Entreprises { get; set; }
         public DbSet<Reception> Receptions { get; set; }
         public DbSet<Vente> Ventes { get; set; }
+        public DbSet<Marque> Marques { get; set; }
+        public DbSet<MarqueAssignment> MarqueAssignments { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -211,6 +213,32 @@ namespace frutaaaaa.Data
             {
                 eb.ToTable("dossier");
                 eb.HasNoKey();
+            });
+
+            modelBuilder.Entity<Marque>(eb =>
+            {
+                eb.ToTable("marque");
+                eb.HasKey(m => m.codmar);
+                eb.Property(m => m.codmar).HasColumnName("codmar");
+                eb.Property(m => m.desmar).HasColumnName("desmar");
+                eb.Property(m => m.lier).HasColumnName("lier");
+
+                // Set collation to latin1_swedish_ci as per the CREATE TABLE
+                eb.Property(m => m.desmar).UseCollation("latin1_swedish_ci");
+                eb.Property(m => m.lier).UseCollation("latin1_swedish_ci");
+            });
+
+            modelBuilder.Entity<MarqueAssignment>(eb =>
+            {
+                eb.ToTable("marque_assignment");
+                eb.HasKey(ma => ma.Id);
+                eb.Property(ma => ma.Id).HasColumnName("id").ValueGeneratedOnAdd();
+                eb.Property(ma => ma.Codmar).HasColumnName("codmar");
+                eb.Property(ma => ma.Refver).HasColumnName("refver");
+                eb.Property(ma => ma.Codvar).HasColumnName("codvar");
+
+                // Unique index on (codmar, refver, codvar)
+                eb.HasIndex(ma => new { ma.Codmar, ma.Refver, ma.Codvar }).IsUnique();
             });
         }
     }
