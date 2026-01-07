@@ -40,6 +40,9 @@ namespace frutaaaaa.Data
         public DbSet<Vente> Ventes { get; set; }
         public DbSet<Marque> Marques { get; set; }
         public DbSet<MarqueAssignment> MarqueAssignments { get; set; }
+        public DbSet<SampleTest> SampleTests { get; set; }
+        public DbSet<DailyCheck> DailyChecks { get; set; }
+        public DbSet<DailyCheckDetail> DailyCheckDetails { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -239,6 +242,48 @@ namespace frutaaaaa.Data
 
                 // Unique index on (codmar, refver, codvar)
                 eb.HasIndex(ma => new { ma.Codmar, ma.Refver, ma.Codvar }).IsUnique();
+            });
+
+            modelBuilder.Entity<SampleTest>(eb =>
+            {
+                eb.ToTable("sample_test");
+                eb.HasKey(s => s.Id);
+                eb.Property(s => s.Id).HasColumnName("id").ValueGeneratedOnAdd();
+                eb.Property(s => s.Numrec).HasColumnName("numrec");
+                eb.Property(s => s.Coddes).HasColumnName("coddes");
+                eb.Property(s => s.Codvar).HasColumnName("codvar");
+                eb.Property(s => s.StartDate).HasColumnName("start_date");
+                eb.Property(s => s.InitialFruitCount).HasColumnName("initial_fruit_count");
+                eb.Property(s => s.Status).HasColumnName("status").HasConversion<string>();
+            });
+
+            modelBuilder.Entity<DailyCheck>(eb =>
+            {
+                eb.ToTable("daily_check");
+                eb.HasKey(d => d.Id);
+                eb.Property(d => d.Id).HasColumnName("id").ValueGeneratedOnAdd();
+                eb.Property(d => d.SampleTestId).HasColumnName("sample_test_id");
+                eb.Property(d => d.CheckDate).HasColumnName("check_date");
+
+                eb.HasOne(d => d.SampleTest)
+                  .WithMany()
+                  .HasForeignKey(d => d.SampleTestId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<DailyCheckDetail>(eb =>
+            {
+                eb.ToTable("daily_check_detail");
+                eb.HasKey(dd => dd.Id);
+                eb.Property(dd => dd.Id).HasColumnName("id").ValueGeneratedOnAdd();
+                eb.Property(dd => dd.DailyCheckId).HasColumnName("daily_check_id");
+                eb.Property(dd => dd.DefectType).HasColumnName("defect_type").HasConversion<string>();
+                eb.Property(dd => dd.Quantity).HasColumnName("quantity");
+
+                eb.HasOne(dd => dd.DailyCheck)
+                  .WithMany()
+                  .HasForeignKey(dd => dd.DailyCheckId)
+                  .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }
