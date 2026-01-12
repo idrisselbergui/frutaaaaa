@@ -58,11 +58,58 @@ namespace frutaaaaa.Controllers
                         return new SampleTestDto
                         {
                             Id = s.Id,
-                            Numrec = s.Numrec,
+                            Numpal = s.Numpal,
                             Coddes = s.Coddes,
                             Codvar = s.Codvar,
                             StartDate = s.StartDate,
                             InitialFruitCount = s.InitialFruitCount,
+                            Pdsfru = s.Pdsfru,
+                            Couleur1 = s.Couleur1,
+                            Couleur2 = s.Couleur2,
+                            Status = s.Status,
+                            IsCheckedToday = isCheckedToday
+                        };
+                    }).ToList();
+
+                    return sampleDtos;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        // GET: api/samples/all
+        [HttpGet("all")]
+        public async Task<ActionResult<IEnumerable<SampleTestDto>>> GetAllSamples([FromHeader(Name = "X-Database-Name")] string database)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    var today = DateTime.Today;
+
+                    var samples = await _context.SampleTests
+                        .OrderByDescending(s => s.StartDate)
+                        .ToListAsync();
+
+                    var sampleDtos = samples.Select(s =>
+                    {
+                        var isCheckedToday = _context.DailyChecks
+                            .Any(dc => dc.SampleTestId == s.Id && dc.CheckDate.Date == today);
+
+                        return new SampleTestDto
+                        {
+                            Id = s.Id,
+                            Numpal = s.Numpal,
+                            Coddes = s.Coddes,
+                            Codvar = s.Codvar,
+                            StartDate = s.StartDate,
+                            InitialFruitCount = s.InitialFruitCount,
+                            Pdsfru = s.Pdsfru,
+                            Couleur1 = s.Couleur1,
+                            Couleur2 = s.Couleur2,
                             Status = s.Status,
                             IsCheckedToday = isCheckedToday
                         };
@@ -99,15 +146,6 @@ namespace frutaaaaa.Controllers
                     if (sample.Status != SampleTestStatus.Active)
                     {
                         return BadRequest("Sample is not active.");
-                    }
-
-                    // Check if a check already exists for this date
-                    var existingCheck = await _context.DailyChecks
-                        .FirstOrDefaultAsync(dc => dc.SampleTestId == id && dc.CheckDate.Date == request.CheckDate.Date);
-
-                    if (existingCheck != null)
-                    {
-                        return BadRequest("A check already exists for this date.");
                     }
 
                     // Create the daily check
@@ -151,20 +189,33 @@ namespace frutaaaaa.Controllers
             {
                 using (var _context = CreateDbContext(database))
                 {
-                    // Get all receptions that don't already have sample tests
-                    var receptions = await _context.Receptions
-                        .Where(r => !_context.SampleTests.Any(st => st.Numrec == r.Numrec))
-                        .Select(r => new {
-                            Numrec = r.Numrec,
-                            Codvar = r.Codvar,
-                            Refver = r.Refver,
-                            Nbrfru = r.Nbrfru,
-                            Dterec = r.Dterec
-                        })
-                        .OrderByDescending(r => r.Numrec)
+                    // Get all palettes from the last 3 days that don't already have sample tests
+                    var threeDaysAgo = DateTime.Now.AddDays(-3);
+                    var palettes = await _context.palbruts
+                        .Where(p => p.dterec >= threeDaysAgo && !_context.SampleTests.Any(st => st.Numpal == p.numpal))
+                        .Join(_context.Vergers,
+                            p => p.refver,
+                            v => v.refver,
+                            (p, v) => new { Palette = p, Verger = v })
+                        .Join(_context.TPalettes,
+                            pv => pv.Palette.codtyp,
+                            t => t.codtyp,
+                            (pv, t) => new {
+                                numpal = pv.Palette.numpal,
+                                numrec = pv.Palette.numrec,
+                                codvar = pv.Palette.codvar,
+                                refadh = pv.Palette.refadh,
+                                refver = pv.Palette.refver,
+                                nbrcai = pv.Palette.nbrcai,
+                                pdsfru = pv.Palette.pdsfru,
+                                dterec = pv.Palette.dterec,
+                                nomver = pv.Verger.nomver,
+                                nomemb = t.nomemb
+                            })
+                        .OrderByDescending(p => p.numpal)
                         .ToListAsync();
 
-                    return receptions;
+                    return palettes;
                 }
             }
             catch (System.Exception ex)
@@ -186,23 +237,26 @@ namespace frutaaaaa.Controllers
             {
                 using (var _context = CreateDbContext(database))
                 {
-                    // Check if a sample test already exists for this reception
+                    // Check if a sample test already exists for this palette
                     var existingSample = await _context.SampleTests
-                        .FirstOrDefaultAsync(st => st.Numrec == request.Numrec);
+                        .FirstOrDefaultAsync(st => st.Numpal == request.Numpal);
 
                     if (existingSample != null)
                     {
-                        return BadRequest("A sample test already exists for this reception number.");
+                        return BadRequest("A sample test already exists for this palette number.");
                     }
 
                     // Create the sample test
                     var sampleTest = new SampleTest
                     {
-                        Numrec = request.Numrec,
+                        Numpal = request.Numpal,
                         Coddes = request.Coddes,
                         Codvar = request.Codvar,
                         StartDate = request.StartDate,
                         InitialFruitCount = request.InitialFruitCount,
+                        Pdsfru = request.Pdsfru,
+                        Couleur1 = request.Couleur1,
+                        Couleur2 = request.Couleur2,
                         Status = request.Status
                     };
 
@@ -213,11 +267,14 @@ namespace frutaaaaa.Controllers
                     var dto = new SampleTestDto
                     {
                         Id = sampleTest.Id,
-                        Numrec = sampleTest.Numrec,
+                        Numpal = sampleTest.Numpal,
                         Coddes = sampleTest.Coddes,
                         Codvar = sampleTest.Codvar,
                         StartDate = sampleTest.StartDate,
                         InitialFruitCount = sampleTest.InitialFruitCount,
+                        Pdsfru = sampleTest.Pdsfru,
+                        Couleur1 = sampleTest.Couleur1,
+                        Couleur2 = sampleTest.Couleur2,
                         Status = sampleTest.Status,
                         IsCheckedToday = false
                     };
@@ -253,16 +310,51 @@ namespace frutaaaaa.Controllers
                     var dto = new SampleTestDto
                     {
                         Id = sample.Id,
-                        Numrec = sample.Numrec,
+                        Numpal = sample.Numpal,
                         Coddes = sample.Coddes,
                         Codvar = sample.Codvar,
                         StartDate = sample.StartDate,
                         InitialFruitCount = sample.InitialFruitCount,
+                        Pdsfru = sample.Pdsfru,
+                        Couleur1 = sample.Couleur1,
+                        Couleur2 = sample.Couleur2,
                         Status = sample.Status,
                         IsCheckedToday = isCheckedToday
                     };
 
                     return dto;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        // PUT: api/samples/{id}/status
+        [HttpPut("{id}/status")]
+        public async Task<IActionResult> UpdateSampleStatus(int id, [FromHeader(Name = "X-Database-Name")] string database, [FromBody] UpdateSampleStatusRequest request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Invalid request data.");
+            }
+
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    var sample = await _context.SampleTests.FindAsync(id);
+                    if (sample == null)
+                    {
+                        return NotFound("Sample test not found.");
+                    }
+
+                    // Update the status
+                    sample.Status = request.Status;
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new { Message = "Sample status updated successfully." });
                 }
             }
             catch (System.Exception ex)

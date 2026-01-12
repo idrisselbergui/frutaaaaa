@@ -249,7 +249,7 @@ namespace frutaaaaa.Data
                 eb.ToTable("sample_test");
                 eb.HasKey(s => s.Id);
                 eb.Property(s => s.Id).HasColumnName("id").ValueGeneratedOnAdd();
-                eb.Property(s => s.Numrec).HasColumnName("numrec");
+                eb.Property(s => s.Numpal).HasColumnName("numpal");
                 eb.Property(s => s.Coddes).HasColumnName("coddes");
                 eb.Property(s => s.Codvar).HasColumnName("codvar");
                 eb.Property(s => s.StartDate).HasColumnName("start_date");

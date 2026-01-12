@@ -17,8 +17,8 @@ namespace frutaaaaa.Models
         [Column("id")]
         public int Id { get; set; }
 
-        [Column("numrec")]
-        public int Numrec { get; set; }
+        [Column("numpal")]
+        public int Numpal { get; set; }
 
         [Column("coddes")]
         public short? Coddes { get; set; }
@@ -31,6 +31,15 @@ namespace frutaaaaa.Models
 
         [Column("initial_fruit_count")]
         public int InitialFruitCount { get; set; }
+
+        [Column("pdsfru")]
+        public decimal? Pdsfru { get; set; }
+
+        [Column("couleur1")]
+        public int? Couleur1 { get; set; }
+
+        [Column("couleur2")]
+        public int? Couleur2 { get; set; }
 
         [Column("status")]
         public SampleTestStatus Status { get; set; }
