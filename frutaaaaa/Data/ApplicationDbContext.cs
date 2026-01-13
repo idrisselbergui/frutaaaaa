@@ -264,10 +264,14 @@ namespace frutaaaaa.Data
                 eb.Property(d => d.Id).HasColumnName("id").ValueGeneratedOnAdd();
                 eb.Property(d => d.SampleTestId).HasColumnName("sample_test_id");
                 eb.Property(d => d.CheckDate).HasColumnName("check_date");
+                eb.Property(d => d.Pdsfru).HasColumnName("pdsfru").HasColumnType("DOUBLE");
+                eb.Property(d => d.Couleur1).HasColumnName("coulour1");
+                eb.Property(d => d.Couleur2).HasColumnName("coulour2");
 
-                eb.HasOne(d => d.SampleTest)
-                  .WithMany()
-                  .HasForeignKey(d => d.SampleTestId)
+                // Configure relationship from DailyCheck side
+                eb.HasMany(d => d.Details)
+                  .WithOne(dd => dd.DailyCheck)
+                  .HasForeignKey(dd => dd.DailyCheckId)
                   .OnDelete(DeleteBehavior.Cascade);
             });
 
@@ -277,13 +281,10 @@ namespace frutaaaaa.Data
                 eb.HasKey(dd => dd.Id);
                 eb.Property(dd => dd.Id).HasColumnName("id").ValueGeneratedOnAdd();
                 eb.Property(dd => dd.DailyCheckId).HasColumnName("daily_check_id");
-                eb.Property(dd => dd.DefectType).HasColumnName("defect_type").HasConversion<string>();
+                eb.Property(dd => dd.DefectId).HasColumnName("defect_id");
                 eb.Property(dd => dd.Quantity).HasColumnName("quantity");
-
-                eb.HasOne(dd => dd.DailyCheck)
-                  .WithMany()
-                  .HasForeignKey(dd => dd.DailyCheckId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                
+                // Explicitly ignore navigation property configuration here - it's done above
             });
         }
     }

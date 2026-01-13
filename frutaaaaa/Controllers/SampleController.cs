@@ -128,7 +128,7 @@ namespace frutaaaaa.Controllers
         [HttpPost("{id}/check")]
         public async Task<IActionResult> PostDailyCheck(int id, [FromHeader(Name = "X-Database-Name")] string database, [FromBody] DailyCheckRequest request)
         {
-            if (request == null || request.Defects == null)
+            if (request == null)
             {
                 return BadRequest("Invalid request data.");
             }
@@ -148,36 +148,83 @@ namespace frutaaaaa.Controllers
                         return BadRequest("Sample is not active.");
                     }
 
-                    // Create the daily check
-                    var dailyCheck = new DailyCheck
-                    {
-                        SampleTestId = id,
-                        CheckDate = request.CheckDate.Date
-                    };
+                    // Check if daily check already exists for this sample and date
+                    var existingDailyCheck = await _context.DailyChecks
+                        .FirstOrDefaultAsync(dc => dc.SampleTestId == id && dc.CheckDate.Date == request.CheckDate.Date);
 
-                    _context.DailyChecks.Add(dailyCheck);
-                    await _context.SaveChangesAsync();
+                    DailyCheck dailyCheck;
 
-                    // Add defect details
-                    foreach (var defect in request.Defects)
+                    if (existingDailyCheck != null)
                     {
-                        var detail = new DailyCheckDetail
+                        // Update existing daily check
+                        existingDailyCheck.Pdsfru = (double)(request.Pdsfru ?? 0);
+                        existingDailyCheck.Couleur1 = request.Couleur1 ?? 0;
+                        existingDailyCheck.Couleur2 = request.Couleur2 ?? 0;
+                        dailyCheck = existingDailyCheck;
+                    }
+                    else
+                    {
+                        // Create new daily check
+                        dailyCheck = new DailyCheck
                         {
-                            DailyCheckId = dailyCheck.Id,
-                            DefectType = defect.Type,
-                            Quantity = defect.Quantity
+                            SampleTestId = id,
+                            CheckDate = request.CheckDate.Date,
+                            Pdsfru = (double)(request.Pdsfru ?? 0),
+                            Couleur1 = request.Couleur1 ?? 0,
+                            Couleur2 = request.Couleur2 ?? 0
                         };
-                        _context.DailyCheckDetails.Add(detail);
+                        _context.DailyChecks.Add(dailyCheck);
                     }
 
                     await _context.SaveChangesAsync();
+
+                    // Handle defect details (only if there are defects to add)
+                    if (request.Defects != null && request.Defects.Count > 0)
+                    {
+                        Console.WriteLine($"Processing {request.Defects.Count} defects for daily check {dailyCheck.Id}");
+                            // Remove existing defect details for this daily check
+                            var existingDetails = await _context.DailyCheckDetails
+                                .Where(d => d.DailyCheckId == dailyCheck.Id)
+                                .ToListAsync();
+                            _context.DailyCheckDetails.RemoveRange(existingDetails);
+
+                            // Add new defect details
+                            foreach (var defect in request.Defects)
+                            {
+                                var detail = new DailyCheckDetail
+                                {
+                                    DailyCheckId = dailyCheck.Id,
+                                    DefectId = defect.DefectId,
+                                    Quantity = defect.Quantity
+                                };
+                                _context.DailyCheckDetails.Add(detail);
+                            }
+
+                            await _context.SaveChangesAsync();
+                            Console.WriteLine("Defect details saved successfully");
+                    }
+                    else
+                    {
+                        Console.WriteLine("No defects to process (Defects is null or empty)");
+                    }
 
                     return Ok(new { Message = "Daily check saved successfully.", DailyCheckId = dailyCheck.Id });
                 }
             }
             catch (System.Exception ex)
             {
-                return StatusCode(500, $"An error occurred: {ex.Message}");
+                Console.WriteLine($"ERROR in PostDailyCheck: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                    Console.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
+                }
+                return StatusCode(500, new { 
+                    Message = $"An error occurred: {ex.Message}",
+                    StackTrace = ex.StackTrace,
+                    InnerException = ex.InnerException?.Message
+                });
             }
         }
 
@@ -360,6 +407,50 @@ namespace frutaaaaa.Controllers
             catch (System.Exception ex)
             {
                 return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        // GET: api/samples/{id}/daily-check/{date}
+        [HttpGet("{id}/daily-check/{date}")]
+        public async Task<ActionResult<DailyCheck>> GetDailyCheck(int id, string date, [FromHeader(Name = "X-Database-Name")] string database)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    // Check if sample exists first
+                    var sample = await _context.SampleTests.FindAsync(id);
+                    if (sample == null)
+                    {
+                        return Ok(null); // Return null instead of 404
+                    }
+
+                    var checkDate = DateTime.Parse(date).Date;
+                    Console.WriteLine($"Looking for daily check: SampleId={id}, Date={checkDate}");
+
+                    // Query for daily check - let errors show on console
+                    var dailyCheck = await _context.DailyChecks
+                        .Include(dc => dc.Details)
+                        .FirstOrDefaultAsync(dc => dc.SampleTestId == id && dc.CheckDate.Date == checkDate);
+
+                    if (dailyCheck != null)
+                    {
+                        Console.WriteLine($"Found daily check: Id={dailyCheck.Id}, Pdsfru={dailyCheck.Pdsfru}, Couleur1={dailyCheck.Couleur1}, Couleur2={dailyCheck.Couleur2}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("No daily check found for this sample and date");
+                    }
+
+                    // Return the daily check data (null if not found)
+                    return Ok(dailyCheck);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                // Log the error and return null instead of 500
+                Console.WriteLine($"Error in GetDailyCheck: {ex.Message}");
+                return Ok(null);
             }
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -17,11 +18,19 @@ namespace frutaaaaa.Models
         [Column("check_date")]
         public DateTime CheckDate { get; set; }
 
-        // Navigation property
+        [Column("pdsfru")]
+        public double Pdsfru { get; set; }
+
+        [Column("coulour1")]
+        public int Couleur1 { get; set; }
+
+        [Column("coulour2")]
+        public int Couleur2 { get; set; }
+
+        // Navigation properties
         [ForeignKey("SampleTestId")]
         public virtual SampleTest SampleTest { get; set; }
 
-        // Calculated property
-        public int DayNumber => (CheckDate.Date - SampleTest?.StartDate.Date)?.Days + 1 ?? 0;
+        public virtual ICollection<DailyCheckDetail> Details { get; set; } = new List<DailyCheckDetail>();
     }
 }
