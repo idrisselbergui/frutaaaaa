@@ -50,26 +50,38 @@ namespace frutaaaaa.Controllers
                         .Where(s => s.Status == SampleTestStatus.Active)
                         .ToListAsync();
 
-                    var sampleDtos = samples.Select(s =>
-                    {
-                        var isCheckedToday = _context.DailyChecks
-                            .Any(dc => dc.SampleTestId == s.Id && dc.CheckDate.Date == today);
+                    var sampleDtos = new List<SampleTestDto>();
 
-                        return new SampleTestDto
+                    foreach (var s in samples)
+                    {
+                        var isCheckedToday = await _context.DailyChecks
+                            .AnyAsync(dc => dc.SampleTestId == s.Id && dc.CheckDate.Date == today);
+                        
+                        // Fetch Verger Name
+                        var vergerName = await _context.palbruts
+                            .Where(p => p.numpal == s.Numpal)
+                            .Join(_context.Vergers,
+                                p => p.refver,
+                                v => v.refver,
+                                (p, v) => v.nomver)
+                            .FirstOrDefaultAsync();
+
+                        sampleDtos.Add(new SampleTestDto
                         {
                             Id = s.Id,
                             Numpal = s.Numpal,
                             Coddes = s.Coddes,
                             Codvar = s.Codvar,
                             StartDate = s.StartDate,
+                            VergerName = vergerName,
                             InitialFruitCount = s.InitialFruitCount,
                             Pdsfru = s.Pdsfru,
                             Couleur1 = s.Couleur1,
                             Couleur2 = s.Couleur2,
                             Status = s.Status,
                             IsCheckedToday = isCheckedToday
-                        };
-                    }).ToList();
+                        });
+                    }
 
                     return sampleDtos;
                 }
@@ -84,7 +96,7 @@ namespace frutaaaaa.Controllers
         [HttpGet("all")]
         public async Task<ActionResult<IEnumerable<SampleTestDto>>> GetAllSamples([FromHeader(Name = "X-Database-Name")] string database)
         {
-            try
+             try
             {
                 using (var _context = CreateDbContext(database))
                 {
@@ -94,26 +106,38 @@ namespace frutaaaaa.Controllers
                         .OrderByDescending(s => s.StartDate)
                         .ToListAsync();
 
-                    var sampleDtos = samples.Select(s =>
-                    {
-                        var isCheckedToday = _context.DailyChecks
-                            .Any(dc => dc.SampleTestId == s.Id && dc.CheckDate.Date == today);
+                    var sampleDtos = new List<SampleTestDto>();
 
-                        return new SampleTestDto
+                    foreach (var s in samples)
+                    {
+                        var isCheckedToday = await _context.DailyChecks
+                            .AnyAsync(dc => dc.SampleTestId == s.Id && dc.CheckDate.Date == today);
+
+                        // Fetch Verger Name
+                        var vergerName = await _context.palbruts
+                            .Where(p => p.numpal == s.Numpal)
+                            .Join(_context.Vergers,
+                                p => p.refver,
+                                v => v.refver,
+                                (p, v) => v.nomver)
+                            .FirstOrDefaultAsync();
+
+                        sampleDtos.Add(new SampleTestDto
                         {
                             Id = s.Id,
                             Numpal = s.Numpal,
                             Coddes = s.Coddes,
                             Codvar = s.Codvar,
                             StartDate = s.StartDate,
+                            VergerName = vergerName,
                             InitialFruitCount = s.InitialFruitCount,
                             Pdsfru = s.Pdsfru,
                             Couleur1 = s.Couleur1,
                             Couleur2 = s.Couleur2,
                             Status = s.Status,
                             IsCheckedToday = isCheckedToday
-                        };
-                    }).ToList();
+                        });
+                    }
 
                     return sampleDtos;
                 }
@@ -451,6 +475,76 @@ namespace frutaaaaa.Controllers
                 // Log the error and return null instead of 500
                 Console.WriteLine($"Error in GetDailyCheck: {ex.Message}");
                 return Ok(null);
+            }
+        }
+
+        // GET: api/samples/{id}/history
+        [HttpGet("{id}/history")]
+        public async Task<ActionResult<SampleHistoryDto>> GetSampleHistory(int id, [FromHeader(Name = "X-Database-Name")] string database)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    var sample = await _context.SampleTests.FindAsync(id);
+                    if (sample == null)
+                    {
+                        return NotFound("Sample test not found.");
+                    }
+
+                    var dailyChecks = await _context.DailyChecks
+                        .Include(dc => dc.Details)
+                        .Where(dc => dc.SampleTestId == id)
+                        .OrderBy(dc => dc.CheckDate)
+                        .ToListAsync();
+
+                    // Fetch Verger Name
+                    var vergerName = await _context.palbruts
+                        .Where(p => p.numpal == sample.Numpal)
+                        .Join(_context.Vergers,
+                            p => p.refver,
+                            v => v.refver,
+                            (p, v) => v.nomver)
+                        .FirstOrDefaultAsync();
+
+                    var historyDto = new SampleHistoryDto
+                    {
+                        Sample = new SampleTestDto
+                        {
+                            Id = sample.Id,
+                            Numpal = sample.Numpal,
+                            Coddes = sample.Coddes,
+                            Codvar = sample.Codvar,
+                            StartDate = sample.StartDate,
+                            VergerName = vergerName,
+                            InitialFruitCount = sample.InitialFruitCount,
+                            Pdsfru = sample.Pdsfru,
+                            Couleur1 = sample.Couleur1,
+                            Couleur2 = sample.Couleur2,
+                            Status = sample.Status,
+                            IsCheckedToday = dailyChecks.Any(dc => dc.CheckDate.Date == DateTime.Today)
+                        },
+                        DailyChecks = dailyChecks.Select(dc => new DailyCheckHistoryDto
+                        {
+                            Id = dc.Id,
+                            CheckDate = dc.CheckDate,
+                            Pdsfru = dc.Pdsfru,
+                            Couleur1 = dc.Couleur1,
+                            Couleur2 = dc.Couleur2,
+                            Defects = dc.Details.Select(d => new DefectHistoryDto
+                            {
+                                DefectId = d.DefectId,
+                                Quantity = d.Quantity
+                            }).ToList()
+                        }).ToList()
+                    };
+
+                    return Ok(historyDto);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
     }
