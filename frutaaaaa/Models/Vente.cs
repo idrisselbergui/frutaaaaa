@@ -15,6 +15,10 @@ namespace frutaaaaa.Models
         public double MontantTotal { get; set; }
         [Column("numlot")]  // optional, to specify column name
         public int? Numlot { get; set; }
+
+        [Column("codtype")]
+        public int? Codtype { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }

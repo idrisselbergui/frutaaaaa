@@ -38,6 +38,7 @@ namespace frutaaaaa.Data
         public DbSet<Entreprise> Entreprises { get; set; }
         public DbSet<Reception> Receptions { get; set; }
         public DbSet<Vente> Ventes { get; set; }
+        public DbSet<VecartD> VecartDs { get; set; }
         public DbSet<Marque> Marques { get; set; }
         public DbSet<MarqueAssignment> MarqueAssignments { get; set; }
         public DbSet<SampleTest> SampleTests { get; set; }

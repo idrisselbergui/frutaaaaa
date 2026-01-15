@@ -135,48 +135,31 @@ namespace frutaaaaa.Controllers
                                 Price = request.Price,
                                 PoidsTotal = request.PoidsTotal,
                                 MontantTotal = request.MontantTotal,
-                                Numlot = request.Numlot
+                                Numlot = request.Numlot,
+                                Codtype = request.Codtype // Map Codtype
                             };
                             _context.Ventes.Add(vente);
                             await _context.SaveChangesAsync();
 
                             Console.WriteLine($"Created Vente with ID: {vente.Id}");
 
-                            // Update selected ecarts
-                            foreach (var selectedEcart in request.SelectedEcarts)
+                            // Create details in vecart_d
+                            if (request.Details != null && request.Details.Any())
                             {
-                                if (selectedEcart.Table == "ecart_direct")
+                                var details = request.Details.Select(d => new VecartD
                                 {
-                                    var ecart = await _context.EcartDirects.FindAsync(selectedEcart.Id);
-                                    if (ecart != null)
-                                    {
-                                        Console.WriteLine($"Found EcartDirect with ID: {selectedEcart.Id}, associating with Vente ID: {vente.Id}");
-                                        ecart.Numvent = vente.Id;
-                                        ecart.Pdsvent = selectedEcart.Pdsvent;
-                                        _context.Entry(ecart).State = EntityState.Modified;
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine($"EcartDirect with ID: {selectedEcart.Id} not found.");
-                                    }
-                                }
-                                else if (selectedEcart.Table == "ecart_e")
-                                {
-                                    var ecart = await _context.EcartEs.FindAsync(selectedEcart.Id);
-                                    if (ecart != null)
-                                    {
-                                        Console.WriteLine($"Found EcartE with ID: {selectedEcart.Id}, associating with Vente ID: {vente.Id}");
-                                        ecart.numvent = vente.Id;
-                                        ecart.pdsvent = selectedEcart.Pdsvent;
-                                        _context.Entry(ecart).State = EntityState.Modified;
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine($"EcartE with ID: {selectedEcart.Id} not found.");
-                                    }
-                                }
+                                    Numvnt = vente.Id,
+                                    Refver = d.Refver,
+                                    Codgrv = d.Codgrv,
+                                    Pds = d.Pds,
+                                    Nbrcol = d.Nbrcol,
+                                    Numpal = d.Numpal
+                                }).ToList();
+
+                                _context.VecartDs.AddRange(details);
+                                await _context.SaveChangesAsync();
                             }
-                            await _context.SaveChangesAsync();
+                            
                             await transaction.CommitAsync();
 
                             return Ok(new { message = "Vente created successfully", venteId = vente.Id });
@@ -206,50 +189,11 @@ namespace frutaaaaa.Controllers
                     var vente = await _context.Ventes.FindAsync(id);
                     if (vente == null) return NotFound();
 
-                    var directEcarts = await _context.EcartDirects
-                        .Where(e => e.Numvent == id)
-                        .Select(e => new {
-                            table = "ecart_direct",
-                            id = e.Numpal,
-                            pdsvent = e.Pdsvent,
-                            refver = e.Refver,
-                            codvar = e.Codvar,
-                            numbl = e.Numbl
-                        })
+                    var details = await _context.VecartDs
+                        .Where(d => d.Numvnt == id)
                         .ToListAsync();
 
-                    var eEcarts = await _context.EcartEs
-                        .Where(e => e.numvent == id)
-                        .Select(e => new {
-                            table = "ecart_e",
-                            id = e.numpal,
-                            pdsvent = e.pdsvent,
-                            refver = e.refver,
-                            codvar = e.codvar
-                        })
-                        .ToListAsync();
-
-                    var ecarts = directEcarts.Cast<object>().Concat(eEcarts.Cast<object>()).ToList();
-
-                    Console.WriteLine($"Found {ecarts.Count} ecarts for Vente ID: {id}");
-
-                    var codtype = 0;
-                    var directType = await _context.EcartDirects.Where(e => e.Numvent == id).Select(e => e.Codtype).FirstOrDefaultAsync();
-                    if (directType != null && directType != 0)
-                    {
-                        codtype = directType.Value;
-                    }
-                    else
-                    {
-                        var eType = await _context.EcartEs
-                            .Join(_context.EcartDs, e => e.numpal, d => d.numpal, (e, d) => new { e, d })
-                            .Where(x => x.e.numvent == id)
-                            .Select(x => x.d.codtype)
-                            .FirstOrDefaultAsync();
-                        codtype = eType;
-                    }
-
-                    return Ok(new { vente, ecarts, codtype });
+                    return Ok(new { vente, details });
                 }
             }
             catch (Exception ex)
@@ -280,48 +224,29 @@ namespace frutaaaaa.Controllers
                             vente.PoidsTotal = request.PoidsTotal;
                             vente.MontantTotal = request.MontantTotal;
                             vente.Numlot = request.Numlot ?? vente.Numlot;
+                            vente.Codtype = request.Codtype ?? vente.Codtype; // Update Codtype
 
-                            // Reset old ecarts
-                            var directEcarts = await _context.EcartDirects.Where(e => e.Numvent == id).ToListAsync();
-                            foreach (var ecart in directEcarts)
-                            {
-                                ecart.Numvent = null;
-                                ecart.Pdsvent = null;
-                                _context.Entry(ecart).State = EntityState.Modified;
-                            }
-                            var eEcarts = await _context.EcartEs.Where(e => e.numvent == id).ToListAsync();
-                            foreach (var ecart in eEcarts)
-                            {
-                                ecart.numvent = null;
-                                ecart.pdsvent = null;
-                                _context.Entry(ecart).State = EntityState.Modified;
-                            }
+                            // Remove old details
+                            var oldDetails = await _context.VecartDs.Where(d => d.Numvnt == id).ToListAsync();
+                            _context.VecartDs.RemoveRange(oldDetails);
                             await _context.SaveChangesAsync();
 
-                            // Set new selected ecarts
-                            foreach (var selectedEcart in request.SelectedEcarts)
+                            // Add new details
+                            if (request.Details != null && request.Details.Any())
                             {
-                                if (selectedEcart.Table == "ecart_direct")
+                                var newDetails = request.Details.Select(d => new VecartD
                                 {
-                                    var ecart = await _context.EcartDirects.FindAsync(selectedEcart.Id);
-                                    if (ecart != null && ecart.Numvent == null) // Check not taken
-                                    {
-                                        ecart.Numvent = vente.Id;
-                                        ecart.Pdsvent = selectedEcart.Pdsvent;
-                                        _context.Entry(ecart).State = EntityState.Modified;
-                                    }
-                                }
-                                else if (selectedEcart.Table == "ecart_e")
-                                {
-                                    var ecart = await _context.EcartEs.FindAsync(selectedEcart.Id);
-                                    if (ecart != null && ecart.numvent == null) // Check not taken
-                                    {
-                                        ecart.numvent = vente.Id;
-                                        ecart.pdsvent = selectedEcart.Pdsvent;
-                                        _context.Entry(ecart).State = EntityState.Modified;
-                                    }
-                                }
+                                    Numvnt = vente.Id, // Ensure link
+                                    Refver = d.Refver,
+                                    Codgrv = d.Codgrv,
+                                    Pds = d.Pds,
+                                    Nbrcol = d.Nbrcol,
+                                    Numpal = d.Numpal
+                                }).ToList();
+
+                                _context.VecartDs.AddRange(newDetails);
                             }
+
                             await _context.SaveChangesAsync();
                             await transaction.CommitAsync();
 
@@ -356,22 +281,9 @@ namespace frutaaaaa.Controllers
                             var vente = await _context.Ventes.FindAsync(id);
                             if (vente == null) return NotFound();
 
-                            // Reset numvent on related ecarts
-                            var directEcarts = await _context.EcartDirects.Where(e => e.Numvent == id).ToListAsync();
-                            foreach (var ecart in directEcarts)
-                            {
-                                ecart.Numvent = null;
-                                ecart.Pdsvent = null;
-                                _context.Entry(ecart).State = EntityState.Modified;
-                            }
-
-                            var eEcarts = await _context.EcartEs.Where(e => e.numvent == id).ToListAsync();
-                            foreach (var ecart in eEcarts)
-                            {
-                                ecart.numvent = null;
-                                ecart.pdsvent = null;
-                                _context.Entry(ecart).State = EntityState.Modified;
-                            }
+                            // Remove related details
+                            var details = await _context.VecartDs.Where(d => d.Numvnt == id).ToListAsync();
+                            _context.VecartDs.RemoveRange(details);
 
                             _context.Ventes.Remove(vente);
                             await _context.SaveChangesAsync();
@@ -402,13 +314,16 @@ namespace frutaaaaa.Controllers
         public double PoidsTotal { get; set; }
         public double MontantTotal { get; set; }
         public int? Numlot { get; set; }
-        public List<SelectedEcart> SelectedEcarts { get; set; }
+        public int? Codtype { get; set; } // Add Codtype
+        public List<VenteEcartDetailDto> Details { get; set; }
     }
 
-    public class SelectedEcart
+    public class VenteEcartDetailDto
     {
-        public string Table { get; set; } // "ecart_direct" or "ecart_e"
-        public int Id { get; set; } // Numpal for direct, numpal for E
-        public double? Pdsvent { get; set; }
+        public int? Refver { get; set; }
+        public int? Codgrv { get; set; } // Changed from Variete
+        public double? Pds { get; set; }
+        public int? Nbrcol { get; set; }
+        public int? Numpal { get; set; }
     }
 }
