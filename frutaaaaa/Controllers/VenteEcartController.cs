@@ -106,7 +106,11 @@ namespace frutaaaaa.Controllers
             {
                 using (var _context = CreateDbContext(database))
                 {
-                    return await _context.Ventes.Where(v => v.Date != null).OrderByDescending(v => v.Date).ToListAsync();
+                    return await _context.Ventes
+                        .Include(v => v.VecartDs)
+                        .Where(v => v.Date != null)
+                        .OrderByDescending(v => v.Date)
+                        .ToListAsync();
                 }
             }
             catch (Exception ex)

@@ -21,5 +21,7 @@ namespace frutaaaaa.Models
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        public ICollection<VecartD> VecartDs { get; set; }
     }
 }

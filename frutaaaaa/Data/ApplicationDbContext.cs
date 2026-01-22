@@ -123,11 +123,12 @@ namespace frutaaaaa.Data
                 eb.ToTable("vente");
                 eb.HasKey(e => e.Id);
                 eb.Property(e => e.Id).ValueGeneratedOnAdd();
-                eb.Property(e => e.Date).HasColumnType("DATE");
-                eb.Property(e => e.Price).HasColumnType("DOUBLE");
-                eb.Property(e => e.PoidsTotal).HasColumnType("DOUBLE");
                 eb.Property(e => e.MontantTotal).HasColumnType("DOUBLE");
                 eb.Property(e => e.CreatedAt).HasColumnType("DATETIME");
+
+                eb.HasMany(v => v.VecartDs)
+                  .WithOne()
+                  .HasForeignKey(d => d.Numvnt);
             });
 
             modelBuilder.Entity<Traitement>().HasKey(t => t.Numtrait);
