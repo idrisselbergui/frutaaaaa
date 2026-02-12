@@ -752,10 +752,15 @@ public class DashboardController : ControllerBase
                     .Where(x => x.p.dtepal >= startDate.Date && x.p.dtepal <= endDateInclusive)
                     .Join(_context.Varietes, x => x.pd.codvar, v => v.codvar, (x, v) => new { x.pd, x.p, v });
 
+                var ecartQuery = _context.EcartEs
+                    .Where(e => e.dtepal >= startDate.Date && e.dtepal <= endDateInclusive)
+                    .Join(_context.Varietes, e => e.codvar, v => v.codvar, (e, v) => new { e, v });
+
                 if (vergerId.HasValue)
                 {
                     receptionQuery = receptionQuery.Where(x => x.p.refver == vergerId.Value);
                     exportQuery = exportQuery.Where(x => x.pd.refver == vergerId.Value);
+                    ecartQuery = ecartQuery.Where(x => x.e.refver == vergerId.Value);
                 }
 
                 IQueryable<int> varietiesInGroupQuery = null;
@@ -768,11 +773,13 @@ public class DashboardController : ControllerBase
                 {
                     receptionQuery = receptionQuery.Where(x => x.p.codvar == varieteId.Value);
                     exportQuery = exportQuery.Where(x => x.pd.codvar == varieteId.Value);
+                    ecartQuery = ecartQuery.Where(x => x.e.codvar == varieteId.Value);
                 }
                 else if (grpVarId.HasValue && varietiesInGroupQuery != null)
                 {
                     receptionQuery = receptionQuery.Where(x => x.p.codvar != null && varietiesInGroupQuery.Contains(x.p.codvar.Value));
                     exportQuery = exportQuery.Where(x => x.pd.codvar != null && varietiesInGroupQuery.Contains(x.pd.codvar.Value));
+                    ecartQuery = ecartQuery.Where(x => varietiesInGroupQuery.Contains(x.e.codvar));
                 }
 
                 // SNAPSHOTS: raw date rows
@@ -784,10 +791,16 @@ public class DashboardController : ControllerBase
                     .Select(x => new { RefVer = (int?)x.pd.refver, CodVar = (int?)x.v.codvar, DtePal = (DateTime?)x.p.dtepal })
                     .ToListAsync();
 
+                var rawEcartData = await ecartQuery
+                    .Select(x => new { RefVer = (int?)x.e.refver, CodVar = (int?)x.v.codvar, DtePal = (DateTime?)x.e.dtepal })
+                    .ToListAsync();
+
                 // aggregated totals grouped by refver + codgrv
                 var receptionData = receptionQuery.Select(x => new { RefVer = (int?)x.p.refver, CodGrv = (int?)x.v.codgrv, Pdsfru = (decimal?)x.p.pdsfru ?? 0m, Pdscom = 0m, Ecart = 0m });
                 var exportData = exportQuery.Select(x => new { RefVer = (int?)x.pd.refver, CodGrv = (int?)x.v.codgrv, Pdsfru = 0m, Pdscom = (decimal?)x.pd.pdscom ?? 0m, Ecart = 0m });
-                var allData = receptionData.Concat(exportData);
+                var ecartData = ecartQuery.Select(x => new { RefVer = (int?)x.e.refver, CodGrv = (int?)x.v.codgrv, Pdsfru = 0m, Pdscom = 0m, Ecart = (decimal?)x.e.pdsfru ?? 0m });
+                
+                var allData = receptionData.Concat(exportData).Concat(ecartData);
 
                 var aggregated = await allData
                     .GroupBy(x => new { x.RefVer, x.CodGrv })
