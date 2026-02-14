@@ -301,7 +301,7 @@ public class DashboardController : ControllerBase
         [FromHeader(Name = "X-Database-Name")] string database,
         [FromQuery] DateTime startDate,
         [FromQuery] DateTime endDate,
-        [FromQuery] int vergerId,
+        [FromQuery] int? vergerId,
         [FromQuery] int? grpVarId, // --- ADD THIS ---
         [FromQuery] int? varieteId)
     {
@@ -318,8 +318,13 @@ public class DashboardController : ControllerBase
                             join dest in _context.Destinations on d.coddes equals dest.coddes
                             join va in _context.Varietes on pd.codvar equals va.codvar
                             where p.dtepal >= startDate.Date && p.dtepal <= endDateInclusive
-                            && pd.refver == vergerId
+                            // && pd.refver == vergerId  <-- REMOVED HARDCODED FILTER
                             select new { pd, dest, va };
+
+                if (vergerId.HasValue)
+                {
+                    query = query.Where(x => x.pd.refver == vergerId.Value);
+                }
 
                 // --- ADD THIS BLOCK ---
                 if (grpVarId.HasValue)
