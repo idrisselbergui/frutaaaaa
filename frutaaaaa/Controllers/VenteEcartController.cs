@@ -100,17 +100,52 @@ namespace frutaaaaa.Controllers
 
         // GET: api/vente-ecart
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Vente>>> GetVentes([FromHeader(Name = "X-Database-Name")] string database)
+        public async Task<ActionResult<IEnumerable<Vente>>> GetVentes(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            [FromQuery] DateTime? startDate,
+            [FromQuery] DateTime? endDate,
+            [FromQuery] int? vergerId,
+            [FromQuery] int? grpVarId,
+            [FromQuery] int? varieteId)
         {
             try
             {
                 using (var _context = CreateDbContext(database))
                 {
-                    return await _context.Ventes
+                    var query = _context.Ventes
                         .Include(v => v.VecartDs)
                         .Where(v => v.Date != null)
-                        .OrderByDescending(v => v.Date)
-                        .ToListAsync();
+                        .AsQueryable();
+
+                    // Date range filters
+                    if (startDate.HasValue)
+                        query = query.Where(v => v.Date >= startDate.Value.Date);
+                    if (endDate.HasValue)
+                    {
+                        var endDateInclusive = endDate.Value.Date.AddDays(1).AddTicks(-1);
+                        query = query.Where(v => v.Date <= endDateInclusive);
+                    }
+
+                    // Verger filter: keep only ventes that have at least one detail for this verger
+                    if (vergerId.HasValue)
+                        query = query.Where(v => v.VecartDs.Any(d => d.Refver == vergerId.Value));
+
+                    // Groupe variété filter: keep ventes that have at least one detail for this group
+                    if (grpVarId.HasValue)
+                        query = query.Where(v => v.VecartDs.Any(d => d.Codgrv == grpVarId.Value));
+
+                    // Variété filter: join through Varietes to find matching codvar -> codgrv
+                    if (varieteId.HasValue)
+                    {
+                        var codgrv = await _context.Varietes
+                            .Where(v => v.codvar == varieteId.Value)
+                            .Select(v => (int?)v.codgrv)
+                            .FirstOrDefaultAsync();
+                        if (codgrv.HasValue)
+                            query = query.Where(v => v.VecartDs.Any(d => d.Codgrv == codgrv.Value));
+                    }
+
+                    return await query.OrderByDescending(v => v.Date).ToListAsync();
                 }
             }
             catch (Exception ex)
