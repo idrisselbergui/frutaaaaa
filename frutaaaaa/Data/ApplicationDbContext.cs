@@ -22,6 +22,8 @@ namespace frutaaaaa.Data
         public DbSet<DailyProgramDetail> DailyProgramDetails { get; set; }
         public DbSet<Destination> Destinations { get; set; }
         public DbSet<Partenaire> Partenaires { get; set; }
+        public DbSet<Adherent> Adherents { get; set; }
+        public DbSet<AdherentCharge> AdherentCharges { get; set; }
         public DbSet<TPalette> TPalettes { get; set; }
         public DbSet<GrpVar> grpvars { get; set; }
         public DbSet<Verger> Vergers { get; set; }
@@ -44,6 +46,11 @@ namespace frutaaaaa.Data
         public DbSet<SampleTest> SampleTests { get; set; }
         public DbSet<DailyCheck> DailyChecks { get; set; }
         public DbSet<DailyCheckDetail> DailyCheckDetails { get; set; }
+
+        public DbSet<GestionAvance> GestionAvances { get; set; }
+        public DbSet<Charge> Charges { get; set; }
+        public DbSet<PrixEstimatif> PrixEstimatifs { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

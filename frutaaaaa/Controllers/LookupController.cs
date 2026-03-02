@@ -84,6 +84,15 @@ namespace frutaaaaa.Controllers
             }
         }
 
+        [HttpGet("adherents")]
+        public async Task<ActionResult<IEnumerable<Adherent>>> GetAdherents([FromHeader(Name = "X-Database-Name")] string database)
+        {
+            using (var _context = CreateDbContext(database))
+            {
+                return await _context.Adherents.ToListAsync();
+            }
+        }
+
         [HttpGet("vergers")]
         public async Task<ActionResult<IEnumerable<Verger>>> GetVergers([FromHeader(Name = "X-Database-Name")] string database)
         {

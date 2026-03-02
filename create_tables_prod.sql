@@ -1,0 +1,28 @@
+DROP TABLE IF EXISTS `gestionavances`;
+CREATE TABLE IF NOT EXISTS `gestionavances` (
+	`id` INT(11) NOT NULL AUTO_INCREMENT,
+	`refadh` INT(11) NULL DEFAULT NULL,
+	`date` DATE NULL DEFAULT NULL,
+	`annee` INT(11) NULL DEFAULT NULL,
+	`mois` INT(11) NULL DEFAULT NULL,
+	`ttdecompte` DOUBLE NULL DEFAULT NULL,
+	`ttcharges` DOUBLE NULL DEFAULT NULL,
+	`tgExport` DOUBLE NULL DEFAULT NULL,
+	`prix_esteme_mois` DOUBLE NULL DEFAULT NULL,
+	`decaompte_esteme` DOUBLE NULL DEFAULT NULL,
+	`s1` DOUBLE NULL DEFAULT NULL,
+	`s2` DOUBLE NULL DEFAULT NULL,
+	`s3` DOUBLE NULL DEFAULT NULL,
+	`s4` DOUBLE NULL DEFAULT NULL,
+	`montant` DOUBLE NULL DEFAULT NULL,
+    PRIMARY KEY (`id`)
+) COLLATE='utf8mb4_general_ci' ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `prix_estimatifs` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT,
+    `annee` INT(11) NOT NULL,
+    `mois` INT(11) NOT NULL,
+    `codgrv` INT(11) NOT NULL,
+    `prix_estime` DOUBLE NOT NULL,
+    PRIMARY KEY (`id`)
+) COLLATE='utf8mb4_general_ci' ENGINE=InnoDB;
