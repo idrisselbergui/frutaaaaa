@@ -236,6 +236,260 @@ namespace frutaaaaa.Controllers
             }
         }
 
+        // GET: api/GestionAvances/yearly-report
+        [HttpGet("yearly-report")]
+        public async Task<ActionResult<object>> GetYearlyReport(
+            [FromHeader(Name = "X-Database-Name")] string database,
+            [FromQuery] int refadh,
+            [FromQuery] DateTime dateDebut,
+            [FromQuery] DateTime dateFin)
+        {
+            try
+            {
+                using (var _context = CreateDbContext(database))
+                {
+                    // Adherent name
+                    var adherent = await _context.Adherents.FirstOrDefaultAsync(a => a.Refadh == refadh);
+
+                    int yearDebut = dateDebut.Year, yearFin = dateFin.Year;
+
+                    // All gestionavances for this adherent across the full date range years
+                    var avances = await _context.GestionAvances
+                        .Where(g => g.Refadh == refadh && g.Annee >= yearDebut && g.Annee <= yearFin)
+                        .ToListAsync();
+
+                    // All charges joined with charge definitions across the full date range
+                    var rawCharges = await _context.AdherentCharges
+                        .Where(ac => ac.Refadh == refadh
+                                  && ac.Date >= dateDebut && ac.Date <= dateFin)
+                        .Join(_context.Charges,
+                              ac => ac.Idcharge,
+                              c => c.Idcharge,
+                              (ac, c) => new { ac.Date, ac.Montant, c.Label, c.Typecharge })
+                        .ToListAsync();
+
+                    // Distinct charge types
+                    var chargeTypes = rawCharges
+                        .Select(c => string.IsNullOrEmpty(c.Typecharge) ? c.Label : c.Typecharge)
+                        .Distinct().OrderBy(t => t).ToList();
+
+                    // ── Pre-fetch export data for auto-estimation (months with no saved décompte) ──
+                    var validVergerIds = await _context.Vergers
+                        .Where(v => v.refadh == refadh)
+                        .Select(v => v.refver)
+                        .ToListAsync();
+
+                    // All palette details for this adherent in the date range
+                    var allExportsQuery = from pd in _context.Palette_ds
+                                         join p in _context.Palettes on pd.numpal equals p.numpal
+                                         join v in _context.Varietes on pd.codvar equals v.codvar
+                                         where pd.refver.HasValue && validVergerIds.Contains(pd.refver.Value)
+                                            && p.dtepal >= dateDebut && p.dtepal <= dateFin
+                                         select new { pd.pdscom, p.dtepal, v.codgrv };
+
+                    var allExports = validVergerIds.Any()
+                        ? await allExportsQuery.ToListAsync()
+                        : await allExportsQuery.Where(x => false).ToListAsync();
+
+                    // All prix estimatifs for the full period
+                    var allPrices = await _context.PrixEstimatifs
+                        .Where(pe => pe.Annee >= yearDebut && pe.Annee <= yearFin)
+                        .ToListAsync();
+
+                    // Helper: compute week-bucketed tonnage totals from export data for a given month
+                    (double s1, double s2, double s3, double s4, double s5) ComputeExportTonnage(int yr, int mois)
+                    {
+                        if (!validVergerIds.Any()) return (0, 0, 0, 0, 0);
+                        int daysInMonth = DateTime.DaysInMonth(yr, mois);
+                        DateTime firstDay = new DateTime(yr, mois, 1);
+                        DateTime lastDay = new DateTime(yr, mois, daysInMonth);
+                        int off = ((int)firstDay.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                        var monthWeeks = new List<DateTime>();
+                        DateTime mon = firstDay.AddDays(-off);
+                        while (mon <= lastDay)
+                        {
+                            DateTime sun = mon.AddDays(6);
+                            DateTime os = mon < firstDay ? firstDay : mon;
+                            DateTime oe = sun > lastDay ? lastDay : sun;
+                            if ((int)(oe - os).TotalDays + 1 >= 4) monthWeeks.Add(mon);
+                            mon = mon.AddDays(7);
+                        }
+                        var weekToSemaine = new Dictionary<DateTime, int>();
+                        for (int i = 0; i < monthWeeks.Count; i++) weekToSemaine[monthWeeks[i]] = i + 1;
+                        double ts1 = 0, ts2 = 0, ts3 = 0, ts4 = 0, ts5 = 0;
+                        foreach (var item in allExports)
+                        {
+                            if (!item.dtepal.HasValue) continue;
+                            DateTime dtepal = ((DateTime)item.dtepal.Value).Date;
+                            if (dtepal.Year != yr || dtepal.Month != mois) continue;
+                            int dayOff = ((int)dtepal.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                            DateTime itemMon = dtepal.AddDays(-dayOff);
+                            if (!weekToSemaine.TryGetValue(itemMon, out int sem)) continue;
+                            double kg = (double)(item.pdscom ?? 0);
+                            switch (sem) { case 1: ts1 += kg; break; case 2: ts2 += kg; break; case 3: ts3 += kg; break; case 4: ts4 += kg; break; case 5: ts5 += kg; break; }
+                        }
+                        return (ts1, ts2, ts3, ts4, ts5);
+                    }
+
+                    // Helper: average prix estimatif for a given month across all variety groups
+                    double ComputeEstimatedPrix(int yr, int mois)
+                    {
+                        var monthPrices = allPrices.Where(pe => pe.Annee == yr && pe.Mois == mois).ToList();
+                        if (!monthPrices.Any()) return 0;
+                        return monthPrices.Average(pe => (double)pe.PrixEstime);
+                    }
+
+                    // Helper: valid Mon-Sun week ranges for a given year/month
+                    // Uses the full Mon-Sun span (not clipped to month) so charges on spill-over
+                    // days (e.g. Feb 1 in a Jan-majority week) are still attributed correctly.
+                    List<(DateTime Start, DateTime End)> GetValidRanges(int yr, int mois)
+                    {
+                        int dim = DateTime.DaysInMonth(yr, mois);
+                        var firstDay = new DateTime(yr, mois, 1);
+                        var lastDay  = new DateTime(yr, mois, dim);
+                        int off = ((int)firstDay.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                        var ranges = new List<(DateTime, DateTime)>();
+                        var monday = firstDay.AddDays(-off);
+                        while (monday <= lastDay)
+                        {
+                            var sunday = monday.AddDays(6);
+                            // Clipped overlap used only for the majority-day (>= 4) check
+                            var os = monday < firstDay ? firstDay : monday;
+                            var oe = sunday > lastDay  ? lastDay  : sunday;
+                            if ((int)(oe - os).TotalDays + 1 >= 4)
+                                ranges.Add((monday, sunday)); // store FULL week, not clipped
+                            monday = monday.AddDays(7);
+                        }
+                        return ranges;
+                    }
+
+                    // Build one entry per month in the date range
+                    var monthEntries = new List<(int Year, int Mois)>();
+                    var cur = new DateTime(yearDebut, dateDebut.Month, 1);
+                    var end = new DateTime(yearFin, dateFin.Month, 1);
+                    while (cur <= end)
+                    {
+                        monthEntries.Add((cur.Year, cur.Month));
+                        cur = cur.AddMonths(1);
+                    }
+
+                    var months = monthEntries.Select(e =>
+                    {
+                        int yr = e.Year; int mois = e.Mois;
+                        var ga = avances.FirstOrDefault(a => a.Annee == yr && a.Mois == mois);
+
+                        var validRanges = GetValidRanges(yr, mois);
+                        var mc = rawCharges
+                            .Where(c => c.Date.Year == yr
+                                     && validRanges.Any(r => c.Date.Date >= r.Start && c.Date.Date <= r.End))
+                            .ToList();
+
+                        var chargesByType = mc
+                            .GroupBy(c => string.IsNullOrEmpty(c.Typecharge) ? c.Label : c.Typecharge)
+                            .ToDictionary(g => g.Key, g => g.Sum(x => x.Montant));
+
+                        var totalCharges = mc.Sum(c => c.Montant);
+
+                        if (ga != null)
+                        {
+                            // ── Saved record exists: use stored values ──
+                            double storedPrice = ga.PrixEstemeMois ?? 0;
+                            double tgTotal = ga.TgExport ?? 0;
+                            double decompteEst = ga.DecaompteEsteme ?? 0;
+                            double pricePerKg = storedPrice > 0 ? storedPrice
+                                              : (tgTotal > 0 ? decompteEst / tgTotal : 0);
+
+                            double WeekDh(double? realDec, double? tonnage) =>
+                                (realDec ?? 0) > 0 ? realDec!.Value : (tonnage ?? 0) * pricePerKg;
+
+                            double realDecS1 = WeekDh(ga.RealDecS1, ga.S1);
+                            double realDecS2 = WeekDh(ga.RealDecS2, ga.S2);
+                            double realDecS3 = WeekDh(ga.RealDecS3, ga.S3);
+                            double realDecS4 = WeekDh(ga.RealDecS4, ga.S4);
+                            double realDecS5 = WeekDh(ga.RealDecS5, ga.S5);
+                            double realDecTotal = realDecS1 + realDecS2 + realDecS3 + realDecS4 + realDecS5;
+
+                            double realTS1 = ga.RealTS1 ?? 0, realTS2 = ga.RealTS2 ?? 0,
+                                   realTS3 = ga.RealTS3 ?? 0, realTS4 = ga.RealTS4 ?? 0,
+                                   realTS5 = ga.RealTS5 ?? 0;
+                            double realTonnageSum = realTS1 + realTS2 + realTS3 + realTS4 + realTS5;
+                            double effectiveTonnage = realTonnageSum > 0 ? realTonnageSum : tgTotal;
+
+                            // Calculate true estimated accompt from exact db exports & estimated prices
+                            var (ts1, ts2, ts3, ts4, ts5) = ComputeExportTonnage(yr, mois);
+                            double pricePerKgEst = ComputeEstimatedPrix(yr, mois);
+                            double trueEstimatedAccompt = (ts1 + ts2 + ts3 + ts4 + ts5) * pricePerKgEst;
+
+                            return new
+                            {
+                                Mois = mois, Annee = yr, IsEstimated = false,
+                                Decompte = realDecTotal,
+                                TgExport = effectiveTonnage,
+                                AccomptEstime = trueEstimatedAccompt,
+                                S1 = ga.S1 ?? 0, S2 = ga.S2 ?? 0, S3 = ga.S3 ?? 0,
+                                S4 = ga.S4 ?? 0, S5 = ga.S5 ?? 0,
+                                RealTS1 = realTS1, RealTS2 = realTS2, RealTS3 = realTS3,
+                                RealTS4 = realTS4, RealTS5 = realTS5,
+                                RealDecS1 = realDecS1, RealDecS2 = realDecS2,
+                                RealDecS3 = realDecS3, RealDecS4 = realDecS4,
+                                RealDecS5 = realDecS5,
+                                IsRealDecS1 = (ga.RealDecS1 ?? 0) > 0,
+                                IsRealDecS2 = (ga.RealDecS2 ?? 0) > 0,
+                                IsRealDecS3 = (ga.RealDecS3 ?? 0) > 0,
+                                IsRealDecS4 = (ga.RealDecS4 ?? 0) > 0,
+                                IsRealDecS5 = (ga.RealDecS5 ?? 0) > 0,
+                                ChargesByType = chargesByType,
+                                TotalCharges = totalCharges,
+                                Resultat = realDecTotal - totalCharges
+                            };
+                        }
+                        else
+                        {
+                            // ── No saved record: auto-estimate from export data + prix estimatifs ──
+                            var (ts1, ts2, ts3, ts4, ts5) = ComputeExportTonnage(yr, mois);
+                            double tgTotal = ts1 + ts2 + ts3 + ts4 + ts5;
+                            double pricePerKg = ComputeEstimatedPrix(yr, mois);
+
+                            double rdS1 = ts1 * pricePerKg, rdS2 = ts2 * pricePerKg,
+                                   rdS3 = ts3 * pricePerKg, rdS4 = ts4 * pricePerKg,
+                                   rdS5 = ts5 * pricePerKg;
+                            double realDecTotal = rdS1 + rdS2 + rdS3 + rdS4 + rdS5;
+
+                            return new
+                            {
+                                Mois = mois, Annee = yr, IsEstimated = true,
+                                Decompte = realDecTotal,
+                                TgExport = tgTotal,
+                                AccomptEstime = realDecTotal,
+                                S1 = ts1, S2 = ts2, S3 = ts3, S4 = ts4, S5 = ts5,
+                                RealTS1 = ts1, RealTS2 = ts2, RealTS3 = ts3, RealTS4 = ts4, RealTS5 = ts5,
+                                RealDecS1 = rdS1, RealDecS2 = rdS2, RealDecS3 = rdS3,
+                                RealDecS4 = rdS4, RealDecS5 = rdS5,
+                                IsRealDecS1 = false, IsRealDecS2 = false,
+                                IsRealDecS3 = false, IsRealDecS4 = false, IsRealDecS5 = false,
+                                ChargesByType = chargesByType,
+                                TotalCharges = totalCharges,
+                                Resultat = realDecTotal - totalCharges
+                            };
+                        }
+                    }).ToList();
+
+                    return Ok(new
+                    {
+                        AdherentName = adherent?.Nomadh ?? $"Adhérent {refadh}",
+                        DateDebut = dateDebut.ToString("yyyy-MM-dd"),
+                        DateFin = dateFin.ToString("yyyy-MM-dd"),
+                        ChargeTypes = chargeTypes,
+                        Months = months
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.InnerException?.Message ?? ex.Message}");
+            }
+        }
+
         // DELETE: api/GestionAvances/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteGestionAvance([FromHeader(Name = "X-Database-Name")] string database, int id)

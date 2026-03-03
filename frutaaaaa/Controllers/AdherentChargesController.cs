@@ -133,7 +133,9 @@ namespace frutaaaaa.Controllers
                     int offset = ((int)firstDayOfMonth.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
                     DateTime firstMonday = firstDayOfMonth.AddDays(-offset);
 
-                    // Build a list of valid date ranges (Mon-Sun) where >= 4 days are in this month
+                    // Build a list of valid date ranges (full Mon-Sun span) where >= 4 days are in this month.
+                    // We store the FULL week (not clipped) so spill-over days at month boundaries
+                    // (e.g. a charge on Feb 1 in the Jan 26-Feb 1 week) are still included.
                     var validRanges = new List<(DateTime Start, DateTime End)>();
                     DateTime weekMonday = firstMonday;
                     while (weekMonday <= lastDayOfMonth)
@@ -143,15 +145,18 @@ namespace frutaaaaa.Controllers
                         DateTime overlapEnd = weekSunday > lastDayOfMonth ? lastDayOfMonth : weekSunday;
                         int daysInTargetMonth = (int)(overlapEnd - overlapStart).TotalDays + 1;
                         if (daysInTargetMonth >= 4)
-                            validRanges.Add((overlapStart, overlapEnd));
+                            validRanges.Add((weekMonday, weekSunday)); // full week, not clipped
                         weekMonday = weekMonday.AddDays(7);
                     }
 
-                    // Fetch all charges for this adherent in the calendar month, then filter client-side by valid ranges
+                    // Determine the actual date window covered by all valid ranges (may extend beyond the calendar month)
+                    DateTime fetchFrom = validRanges.Any() ? validRanges.Min(r => r.Start) : firstDayOfMonth;
+                    DateTime fetchTo   = validRanges.Any() ? validRanges.Max(r => r.End)   : lastDayOfMonth;
+
+                    // Fetch charges within the full window (covers spill-over days)
                     var charges = await _context.AdherentCharges
                         .Where(ac => ac.Refadh == refadh
-                                  && ac.Date.Year == annee
-                                  && ac.Date.Month == mois)
+                                  && ac.Date >= fetchFrom && ac.Date <= fetchTo)
                         .ToListAsync();
 
                     double total = charges
