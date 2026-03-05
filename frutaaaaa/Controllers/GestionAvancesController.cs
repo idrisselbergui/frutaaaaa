@@ -291,6 +291,12 @@ namespace frutaaaaa.Controllers
                         ? await allExportsQuery.ToListAsync()
                         : await allExportsQuery.Where(x => false).ToListAsync();
 
+                    var exportedCodGrvs = allExports.Select(x => x.codgrv).Distinct().ToList();
+                    var exportedGrvs = await _context.grpvars
+                        .Where(g => exportedCodGrvs.Contains(g.codgrv))
+                        .Select(g => new { codgrv = g.codgrv, nomgrv = g.nomgrv })
+                        .ToListAsync();
+
                     // All prix estimatifs for the full period
                     var allPrices = await _context.PrixEstimatifs
                         .Where(pe => pe.Annee >= yearDebut && pe.Annee <= yearFin)
@@ -420,6 +426,10 @@ namespace frutaaaaa.Controllers
                             double pricePerKgEst = ComputeEstimatedPrix(yr, mois);
                             double trueEstimatedAccompt = (ts1 + ts2 + ts3 + ts4 + ts5) * pricePerKgEst;
 
+                            var pricesByGrpVar = allPrices
+                                .Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
+                                .ToDictionary(pe => pe.CodGrv.ToString(), pe => pe.PrixEstime);
+
                             return new
                             {
                                 Mois = mois, Annee = yr, IsEstimated = false,
@@ -440,7 +450,8 @@ namespace frutaaaaa.Controllers
                                 IsRealDecS5 = (ga.RealDecS5 ?? 0) > 0,
                                 ChargesByType = chargesByType,
                                 TotalCharges = totalCharges,
-                                Resultat = realDecTotal - totalCharges
+                                Resultat = realDecTotal - totalCharges,
+                                PricesByGrpVar = pricesByGrpVar
                             };
                         }
                         else
@@ -454,6 +465,10 @@ namespace frutaaaaa.Controllers
                                    rdS3 = ts3 * pricePerKg, rdS4 = ts4 * pricePerKg,
                                    rdS5 = ts5 * pricePerKg;
                             double realDecTotal = rdS1 + rdS2 + rdS3 + rdS4 + rdS5;
+
+                            var pricesByGrpVar = allPrices
+                                .Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
+                                .ToDictionary(pe => pe.CodGrv.ToString(), pe => pe.PrixEstime);
 
                             return new
                             {
@@ -469,7 +484,8 @@ namespace frutaaaaa.Controllers
                                 IsRealDecS3 = false, IsRealDecS4 = false, IsRealDecS5 = false,
                                 ChargesByType = chargesByType,
                                 TotalCharges = totalCharges,
-                                Resultat = realDecTotal - totalCharges
+                                Resultat = realDecTotal - totalCharges,
+                                PricesByGrpVar = pricesByGrpVar
                             };
                         }
                     }).ToList();
@@ -480,6 +496,7 @@ namespace frutaaaaa.Controllers
                         DateDebut = dateDebut.ToString("yyyy-MM-dd"),
                         DateFin = dateFin.ToString("yyyy-MM-dd"),
                         ChargeTypes = chargeTypes,
+                        ExportedGrvs = exportedGrvs,
                         Months = months
                     });
                 }
