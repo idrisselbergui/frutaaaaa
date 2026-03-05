@@ -384,6 +384,42 @@ namespace frutaaaaa.Controllers
                         int yr = e.Year; int mois = e.Mois;
                         var ga = avances.FirstOrDefault(a => a.Annee == yr && a.Mois == mois);
 
+                        // Find weeks belonging to this month using the same "majority rule" as Tonnage row
+                        int dim = DateTime.DaysInMonth(yr, mois);
+                        DateTime f1 = new DateTime(yr, mois, 1);
+                        DateTime l1 = new DateTime(yr, mois, dim);
+                        int off = ((int)f1.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                        var mWeeks = new List<DateTime>();
+                        DateTime monIter = f1.AddDays(-off);
+                        while (monIter <= l1)
+                        {
+                            DateTime sunIter = monIter.AddDays(6);
+                            DateTime os = monIter < f1 ? f1 : monIter;
+                            DateTime oe = sunIter > l1 ? l1 : sunIter;
+                            if ((int)(oe - os).TotalDays + 1 >= 4) mWeeks.Add(monIter);
+                            monIter = monIter.AddDays(7);
+                        }
+
+                        // Calculate weighted theoretical value using exact matching-weeks tonnage
+                        double weightedTheoreticalValue = 0;
+                        foreach (var item in allExports)
+                        {
+                            if (!item.dtepal.HasValue) continue;
+                            DateTime dte = ((DateTime)item.dtepal.Value).Date;
+                            
+                            int dOff = ((int)dte.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                            DateTime itemMon = dte.AddDays(-dOff);
+                            
+                            // Only include if this export's week belongs to the current month in the report
+                            if (mWeeks.Contains(itemMon))
+                            {
+                                var price = allPrices.FirstOrDefault(p => p.Annee == yr && p.Mois == mois && p.CodGrv == item.codgrv);
+                                if (price != null)
+                                    weightedTheoreticalValue += (double)(item.pdscom ?? 0) * (double)price.PrixEstime;
+                            }
+                        }
+                        double accomptResult = weightedTheoreticalValue;
+
                         var validRanges = GetValidRanges(yr, mois);
                         var mc = rawCharges
                             .Where(c => c.Date.Year == yr
@@ -398,7 +434,7 @@ namespace frutaaaaa.Controllers
 
                         if (ga != null)
                         {
-                            // ── Saved record exists: use stored values ──
+                            // ── Saved record exists ──
                             double storedPrice = ga.PrixEstemeMois ?? 0;
                             double tgTotal = ga.TgExport ?? 0;
                             double decompteEst = ga.DecaompteEsteme ?? 0;
@@ -421,71 +457,62 @@ namespace frutaaaaa.Controllers
                             double realTonnageSum = realTS1 + realTS2 + realTS3 + realTS4 + realTS5;
                             double effectiveTonnage = realTonnageSum > 0 ? realTonnageSum : tgTotal;
 
-                            // Calculate true estimated accompt from exact db exports & estimated prices
-                            var (ts1, ts2, ts3, ts4, ts5) = ComputeExportTonnage(yr, mois);
-                            double pricePerKgEst = ComputeEstimatedPrix(yr, mois);
-                            double trueEstimatedAccompt = (ts1 + ts2 + ts3 + ts4 + ts5) * pricePerKgEst;
-
-                            var pricesByGrpVar = allPrices
-                                .Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
-                                .ToDictionary(pe => pe.CodGrv.ToString(), pe => pe.PrixEstime);
-
                             return new
                             {
-                                Mois = mois, Annee = yr, IsEstimated = false,
-                                Decompte = realDecTotal,
-                                TgExport = effectiveTonnage,
-                                AccomptEstime = trueEstimatedAccompt,
-                                S1 = ga.S1 ?? 0, S2 = ga.S2 ?? 0, S3 = ga.S3 ?? 0,
-                                S4 = ga.S4 ?? 0, S5 = ga.S5 ?? 0,
-                                RealTS1 = realTS1, RealTS2 = realTS2, RealTS3 = realTS3,
-                                RealTS4 = realTS4, RealTS5 = realTS5,
-                                RealDecS1 = realDecS1, RealDecS2 = realDecS2,
-                                RealDecS3 = realDecS3, RealDecS4 = realDecS4,
-                                RealDecS5 = realDecS5,
-                                IsRealDecS1 = (ga.RealDecS1 ?? 0) > 0,
-                                IsRealDecS2 = (ga.RealDecS2 ?? 0) > 0,
-                                IsRealDecS3 = (ga.RealDecS3 ?? 0) > 0,
-                                IsRealDecS4 = (ga.RealDecS4 ?? 0) > 0,
-                                IsRealDecS5 = (ga.RealDecS5 ?? 0) > 0,
-                                ChargesByType = chargesByType,
-                                TotalCharges = totalCharges,
-                                Resultat = realDecTotal - totalCharges,
-                                PricesByGrpVar = pricesByGrpVar
+                                mois = mois, annee = yr, isEstimated = false,
+                                decompte = realDecTotal,
+                                tgExport = effectiveTonnage,
+                                accomptEstime = accomptResult,
+                                s1 = ga.S1 ?? 0, s2 = ga.S2 ?? 0, s3 = ga.S3 ?? 0,
+                                s4 = ga.S4 ?? 0, s5 = ga.S5 ?? 0,
+                                realTS1 = realTS1, realTS2 = realTS2, realTS3 = realTS3,
+                                realTS4 = realTS4, realTS5 = realTS5,
+                                realDecS1 = realDecS1, realDecS2 = realDecS2,
+                                realDecS3 = realDecS3, realDecS4 = realDecS4,
+                                realDecS5 = realDecS5,
+                                isRealDecS1 = (ga.RealDecS1 ?? 0) > 0,
+                                isRealDecS2 = (ga.RealDecS2 ?? 0) > 0,
+                                isRealDecS3 = (ga.RealDecS3 ?? 0) > 0,
+                                isRealDecS4 = (ga.RealDecS4 ?? 0) > 0,
+                                isRealDecS5 = (ga.RealDecS5 ?? 0) > 0,
+                                chargesByType = chargesByType,
+                                totalCharges = totalCharges,
+                                resultat = realDecTotal - totalCharges,
+                                pricesByGrpVar = allPrices.Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
+                                                 .ToDictionary(pe => pe.CodGrv.ToString(), pe => pe.PrixEstime)
                             };
                         }
                         else
                         {
-                            // ── No saved record: auto-estimate from export data + prix estimatifs ──
+                            // ── No saved record ──
                             var (ts1, ts2, ts3, ts4, ts5) = ComputeExportTonnage(yr, mois);
                             double tgTotal = ts1 + ts2 + ts3 + ts4 + ts5;
-                            double pricePerKg = ComputeEstimatedPrix(yr, mois);
+                            
+                            // Base decompte result on weighted value for consistency
+                            double realDecTotal = weightedTheoreticalValue;
 
-                            double rdS1 = ts1 * pricePerKg, rdS2 = ts2 * pricePerKg,
-                                   rdS3 = ts3 * pricePerKg, rdS4 = ts4 * pricePerKg,
-                                   rdS5 = ts5 * pricePerKg;
-                            double realDecTotal = rdS1 + rdS2 + rdS3 + rdS4 + rdS5;
-
-                            var pricesByGrpVar = allPrices
-                                .Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
-                                .ToDictionary(pe => pe.CodGrv.ToString(), pe => pe.PrixEstime);
+                            double avgPrice = tgTotal > 0 ? realDecTotal / tgTotal : 0;
+                            double rdS1 = ts1 * avgPrice, rdS2 = ts2 * avgPrice,
+                                   rdS3 = ts3 * avgPrice, rdS4 = ts4 * avgPrice,
+                                   rdS5 = ts5 * avgPrice;
 
                             return new
                             {
-                                Mois = mois, Annee = yr, IsEstimated = true,
-                                Decompte = realDecTotal,
-                                TgExport = tgTotal,
-                                AccomptEstime = realDecTotal,
-                                S1 = ts1, S2 = ts2, S3 = ts3, S4 = ts4, S5 = ts5,
-                                RealTS1 = ts1, RealTS2 = ts2, RealTS3 = ts3, RealTS4 = ts4, RealTS5 = ts5,
-                                RealDecS1 = rdS1, RealDecS2 = rdS2, RealDecS3 = rdS3,
-                                RealDecS4 = rdS4, RealDecS5 = rdS5,
-                                IsRealDecS1 = false, IsRealDecS2 = false,
-                                IsRealDecS3 = false, IsRealDecS4 = false, IsRealDecS5 = false,
-                                ChargesByType = chargesByType,
-                                TotalCharges = totalCharges,
-                                Resultat = realDecTotal - totalCharges,
-                                PricesByGrpVar = pricesByGrpVar
+                                mois = mois, annee = yr, isEstimated = true,
+                                decompte = realDecTotal,
+                                tgExport = tgTotal,
+                                accomptEstime = accomptResult,
+                                s1 = ts1, s2 = ts2, s3 = ts3, s4 = ts4, s5 = ts5,
+                                realTS1 = ts1, realTS2 = ts2, realTS3 = ts3, realTS4 = ts4, realTS5 = ts5,
+                                realDecS1 = rdS1, realDecS2 = rdS2, realDecS3 = rdS3,
+                                realDecS4 = rdS4, realDecS5 = rdS5,
+                                isRealDecS1 = false, isRealDecS2 = false,
+                                isRealDecS3 = false, isRealDecS4 = false, isRealDecS5 = false,
+                                chargesByType = chargesByType,
+                                totalCharges = totalCharges,
+                                resultat = realDecTotal - totalCharges,
+                                pricesByGrpVar = allPrices.Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
+                                                 .ToDictionary(pe => pe.CodGrv.ToString(), pe => pe.PrixEstime)
                             };
                         }
                     }).ToList();
