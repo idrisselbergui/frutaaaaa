@@ -327,7 +327,8 @@ namespace frutaaaaa.Controllers
                         {
                             if (!item.dtepal.HasValue) continue;
                             DateTime dtepal = ((DateTime)item.dtepal.Value).Date;
-                            if (dtepal.Year != yr || dtepal.Month != mois) continue;
+                            // No calendar-month filter here — the weekToSemaine check handles
+                            // cross-month boundaries correctly (e.g. Nov 1 in an Oct-majority week)
                             int dayOff = ((int)dtepal.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
                             DateTime itemMon = dtepal.AddDays(-dayOff);
                             if (!weekToSemaine.TryGetValue(itemMon, out int sem)) continue;
@@ -400,8 +401,14 @@ namespace frutaaaaa.Controllers
                             monIter = monIter.AddDays(7);
                         }
 
-                        // Calculate weighted theoretical value using exact matching-weeks tonnage
+                        // Build week-to-semaine mapping for per-week weighted values
+                        var weekToSem = new Dictionary<DateTime, int>();
+                        for (int wi = 0; wi < mWeeks.Count; wi++) weekToSem[mWeeks[wi]] = wi + 1;
+
+                        // Calculate weighted theoretical value AND per-week weighted values
+                        // Each week's DH = Σ(variety_tonnage × variety_price) for all varieties
                         double weightedTheoreticalValue = 0;
+                        double weightedS1 = 0, weightedS2 = 0, weightedS3 = 0, weightedS4 = 0, weightedS5 = 0;
                         foreach (var item in allExports)
                         {
                             if (!item.dtepal.HasValue) continue;
@@ -411,11 +418,15 @@ namespace frutaaaaa.Controllers
                             DateTime itemMon = dte.AddDays(-dOff);
                             
                             // Only include if this export's week belongs to the current month in the report
-                            if (mWeeks.Contains(itemMon))
+                            if (weekToSem.TryGetValue(itemMon, out int sem))
                             {
                                 var price = allPrices.FirstOrDefault(p => p.Annee == yr && p.Mois == mois && p.CodGrv == item.codgrv);
                                 if (price != null)
-                                    weightedTheoreticalValue += (double)(item.pdscom ?? 0) * (double)price.PrixEstime;
+                                {
+                                    double val = (double)(item.pdscom ?? 0) * (double)price.PrixEstime;
+                                    weightedTheoreticalValue += val;
+                                    switch (sem) { case 1: weightedS1 += val; break; case 2: weightedS2 += val; break; case 3: weightedS3 += val; break; case 4: weightedS4 += val; break; case 5: weightedS5 += val; break; }
+                                }
                             }
                         }
                         double accomptResult = weightedTheoreticalValue;
@@ -435,20 +446,17 @@ namespace frutaaaaa.Controllers
                         if (ga != null)
                         {
                             // ── Saved record exists ──
-                            double storedPrice = ga.PrixEstemeMois ?? 0;
                             double tgTotal = ga.TgExport ?? 0;
-                            double decompteEst = ga.DecaompteEsteme ?? 0;
-                            double pricePerKg = storedPrice > 0 ? storedPrice
-                                              : (tgTotal > 0 ? decompteEst / tgTotal : 0);
 
-                            double WeekDh(double? realDec, double? tonnage) =>
-                                (realDec ?? 0) > 0 ? realDec!.Value : (tonnage ?? 0) * pricePerKg;
+                            // Use per-week weighted value (Σ variety_tonnage × variety_price) as fallback
+                            double WeekDh(double? realDec, double weightedVal) =>
+                                (realDec ?? 0) > 0 ? realDec!.Value : weightedVal;
 
-                            double realDecS1 = WeekDh(ga.RealDecS1, ga.S1);
-                            double realDecS2 = WeekDh(ga.RealDecS2, ga.S2);
-                            double realDecS3 = WeekDh(ga.RealDecS3, ga.S3);
-                            double realDecS4 = WeekDh(ga.RealDecS4, ga.S4);
-                            double realDecS5 = WeekDh(ga.RealDecS5, ga.S5);
+                            double realDecS1 = WeekDh(ga.RealDecS1, weightedS1);
+                            double realDecS2 = WeekDh(ga.RealDecS2, weightedS2);
+                            double realDecS3 = WeekDh(ga.RealDecS3, weightedS3);
+                            double realDecS4 = WeekDh(ga.RealDecS4, weightedS4);
+                            double realDecS5 = WeekDh(ga.RealDecS5, weightedS5);
                             double realDecTotal = realDecS1 + realDecS2 + realDecS3 + realDecS4 + realDecS5;
 
                             double realTS1 = ga.RealTS1 ?? 0, realTS2 = ga.RealTS2 ?? 0,
@@ -488,13 +496,11 @@ namespace frutaaaaa.Controllers
                             var (ts1, ts2, ts3, ts4, ts5) = ComputeExportTonnage(yr, mois);
                             double tgTotal = ts1 + ts2 + ts3 + ts4 + ts5;
                             
-                            // Base decompte result on weighted value for consistency
-                            double realDecTotal = weightedTheoreticalValue;
-
-                            double avgPrice = tgTotal > 0 ? realDecTotal / tgTotal : 0;
-                            double rdS1 = ts1 * avgPrice, rdS2 = ts2 * avgPrice,
-                                   rdS3 = ts3 * avgPrice, rdS4 = ts4 * avgPrice,
-                                   rdS5 = ts5 * avgPrice;
+                            // Use per-week weighted values: Σ(variety_tonnage × variety_price) per week
+                            double rdS1 = weightedS1, rdS2 = weightedS2,
+                                   rdS3 = weightedS3, rdS4 = weightedS4,
+                                   rdS5 = weightedS5;
+                            double realDecTotal = rdS1 + rdS2 + rdS3 + rdS4 + rdS5;
 
                             return new
                             {
