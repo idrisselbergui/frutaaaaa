@@ -268,9 +268,9 @@ namespace frutaaaaa.Controllers
                               (ac, c) => new { ac.Date, ac.Montant, c.Label, c.Typecharge })
                         .ToListAsync();
 
-                    // Distinct charge types
-                    var chargeTypes = rawCharges
-                        .Select(c => string.IsNullOrEmpty(c.Typecharge) ? c.Label : c.Typecharge)
+                    // Distinct charge labels
+                    var chargeLabels = rawCharges
+                        .Select(c => c.Label)
                         .Distinct().OrderBy(t => t).ToList();
 
                     // ── Pre-fetch export data for auto-estimation (months with no saved décompte) ──
@@ -437,8 +437,8 @@ namespace frutaaaaa.Controllers
                                      && validRanges.Any(r => c.Date.Date >= r.Start && c.Date.Date <= r.End))
                             .ToList();
 
-                        var chargesByType = mc
-                            .GroupBy(c => string.IsNullOrEmpty(c.Typecharge) ? c.Label : c.Typecharge)
+                        var chargesByLabel = mc
+                            .GroupBy(c => c.Label)
                             .ToDictionary(g => g.Key, g => g.Sum(x => x.Montant));
 
                         var totalCharges = mc.Sum(c => c.Montant);
@@ -483,7 +483,7 @@ namespace frutaaaaa.Controllers
                                 isRealDecS3 = (ga.RealDecS3 ?? 0) > 0,
                                 isRealDecS4 = (ga.RealDecS4 ?? 0) > 0,
                                 isRealDecS5 = (ga.RealDecS5 ?? 0) > 0,
-                                chargesByType = chargesByType,
+                                chargesByLabel = chargesByLabel,
                                 totalCharges = totalCharges,
                                 resultat = realDecTotal - totalCharges,
                                 pricesByGrpVar = allPrices.Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
@@ -514,7 +514,7 @@ namespace frutaaaaa.Controllers
                                 realDecS4 = rdS4, realDecS5 = rdS5,
                                 isRealDecS1 = false, isRealDecS2 = false,
                                 isRealDecS3 = false, isRealDecS4 = false, isRealDecS5 = false,
-                                chargesByType = chargesByType,
+                                chargesByLabel = chargesByLabel,
                                 totalCharges = totalCharges,
                                 resultat = realDecTotal - totalCharges,
                                 pricesByGrpVar = allPrices.Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
@@ -528,7 +528,7 @@ namespace frutaaaaa.Controllers
                         AdherentName = adherent?.Nomadh ?? $"Adhérent {refadh}",
                         DateDebut = dateDebut.ToString("yyyy-MM-dd"),
                         DateFin = dateFin.ToString("yyyy-MM-dd"),
-                        ChargeTypes = chargeTypes,
+                        ChargeLabels = chargeLabels,
                         ExportedGrvs = exportedGrvs,
                         Months = months
                     });
