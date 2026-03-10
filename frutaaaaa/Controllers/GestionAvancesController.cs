@@ -281,11 +281,12 @@ namespace frutaaaaa.Controllers
 
                     // All palette details for this adherent in the date range
                     var allExportsQuery = from pd in _context.Palette_ds
-                                         join p in _context.Palettes on pd.numpal equals p.numpal
+                                         join b in _context.Bdqs on pd.numbdq equals b.numbdq
+                                         join d in _context.Dossiers on b.numdos equals d.numdos
                                          join v in _context.Varietes on pd.codvar equals v.codvar
                                          where pd.refver.HasValue && validVergerIds.Contains(pd.refver.Value)
-                                            && p.dtepal >= dateDebut && p.dtepal <= dateFin
-                                         select new { pd.pdscom, p.dtepal, v.codgrv };
+                                            && d.dtedep >= dateDebut && d.dtedep <= dateFin
+                                         select new { pd.pdscom, d.dtedep, v.codgrv };
 
                     var allExports = validVergerIds.Any()
                         ? await allExportsQuery.ToListAsync()
@@ -325,12 +326,12 @@ namespace frutaaaaa.Controllers
                         double ts1 = 0, ts2 = 0, ts3 = 0, ts4 = 0, ts5 = 0;
                         foreach (var item in allExports)
                         {
-                            if (!item.dtepal.HasValue) continue;
-                            DateTime dtepal = ((DateTime)item.dtepal.Value).Date;
+                            if (!item.dtedep.HasValue) continue;
+                            DateTime dtedep = ((DateTime)item.dtedep.Value).Date;
                             // No calendar-month filter here — the weekToSemaine check handles
                             // cross-month boundaries correctly (e.g. Nov 1 in an Oct-majority week)
-                            int dayOff = ((int)dtepal.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
-                            DateTime itemMon = dtepal.AddDays(-dayOff);
+                            int dayOff = ((int)dtedep.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                            DateTime itemMon = dtedep.AddDays(-dayOff);
                             if (!weekToSemaine.TryGetValue(itemMon, out int sem)) continue;
                             double kg = (double)(item.pdscom ?? 0);
                             switch (sem) { case 1: ts1 += kg; break; case 2: ts2 += kg; break; case 3: ts3 += kg; break; case 4: ts4 += kg; break; case 5: ts5 += kg; break; }
@@ -411,8 +412,8 @@ namespace frutaaaaa.Controllers
                         double weightedS1 = 0, weightedS2 = 0, weightedS3 = 0, weightedS4 = 0, weightedS5 = 0;
                         foreach (var item in allExports)
                         {
-                            if (!item.dtepal.HasValue) continue;
-                            DateTime dte = ((DateTime)item.dtepal.Value).Date;
+                            if (!item.dtedep.HasValue) continue;
+                            DateTime dte = ((DateTime)item.dtedep.Value).Date;
                             
                             int dOff = ((int)dte.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
                             DateTime itemMon = dte.AddDays(-dOff);
@@ -594,12 +595,13 @@ namespace frutaaaaa.Controllers
                     DateTime dteEnd = new DateTime(annee, mois, daysInMonth).AddDays(1).AddTicks(-1);
 
                     var exportQuery = from pd in _context.Palette_ds
-                                      join p in _context.Palettes on pd.numpal equals p.numpal
+                                      join b in _context.Bdqs on pd.numbdq equals b.numbdq
+                                      join d in _context.Dossiers on b.numdos equals d.numdos
                                       join v in _context.Varietes on pd.codvar equals v.codvar
                                       join g in _context.grpvars on v.codgrv equals g.codgrv
                                       where pd.refver.HasValue && validVergerIds.Contains(pd.refver.Value)
-                                         && p.dtepal >= dteStart && p.dtepal <= dteEnd
-                                      select new { pd, p, v, g };
+                                         && d.dtedep >= dteStart && d.dtedep <= dteEnd
+                                      select new { pd, d, v, g };
 
                     var exports = await exportQuery.ToListAsync();
 
@@ -638,12 +640,12 @@ namespace frutaaaaa.Controllers
 
                     foreach (var item in exports)
                     {
-                        if (!item.p.dtepal.HasValue) continue;
+                        if (!item.d.dtedep.HasValue) continue;
 
                         // Find the Monday of the week this export date belongs to
-                        var dtepal = item.p.dtepal.Value.Date;
-                        int dayOffset = ((int)dtepal.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
-                        DateTime itemWeekMonday = dtepal.AddDays(-dayOffset);
+                        var dtedep = item.d.dtedep.Value.Date;
+                        int dayOffset = ((int)dtedep.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                        DateTime itemWeekMonday = dtedep.AddDays(-dayOffset);
 
                         // Skip if this week belongs to a neighbouring month
                         if (!weekToSemaine.TryGetValue(itemWeekMonday, out int semaine))
