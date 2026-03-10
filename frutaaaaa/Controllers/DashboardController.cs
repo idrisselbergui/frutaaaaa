@@ -53,8 +53,9 @@ public class DashboardController : ControllerBase
                     .Where(p => p.dterec >= startDate.Date && p.dterec <= endDateInclusive);
 
                 var paletteDQuery = _context.Palette_ds
-                    .Join(_context.Palettes, pd => pd.numpal, p => p.numpal, (pd, p) => new { PaletteD = pd, Palette = p })
-                    .Where(x => x.Palette.dtepal >= startDate.Date && x.Palette.dtepal <= endDateInclusive);
+                    .Join(_context.Bdqs, pd => pd.numbdq, b => b.numbdq, (pd, b) => new { pd, b })
+                    .Join(_context.Dossiers, kb => kb.b.numdos, d => d.numdos, (kb, d) => new { PaletteD = kb.pd, Dossier = d })
+                    .Where(x => x.Dossier.dtedep >= startDate.Date && x.Dossier.dtedep <= endDateInclusive);
 
                 var ecartQuery = _context.EcartEs.AsQueryable()
                     .Where(e => e.dtepal <= endDateInclusive);
@@ -93,7 +94,7 @@ public class DashboardController : ControllerBase
 
                 // Keep full data with dates for calculations
                 var palBrutList = await palBrutQuery.Select(p => new { p.refver, p.codvar, p.pdsfru, p.dterec }).ToListAsync();
-                var paletteDList = await paletteDQuery.Select(p => new { p.PaletteD.refver, p.PaletteD.codvar, p.PaletteD.pdscom, p.Palette.dtepal }).ToListAsync();
+                var paletteDList = await paletteDQuery.Select(p => new { p.PaletteD.refver, p.PaletteD.codvar, p.PaletteD.pdscom, dtepal = p.Dossier.dtedep }).ToListAsync();
                 var ecartList = await ecartQuery.Select(e => new { e.refver, e.codvar, e.pdsfru, e.dtepal }).ToListAsync();
 
                 var vergers = await _context.Vergers.ToDictionaryAsync(v => v.refver, v => v.nomver ?? "N/A");
@@ -227,13 +228,12 @@ public class DashboardController : ControllerBase
                 var endDateInclusive = endDate.Date.AddDays(1).AddTicks(-1);
 
                 var query = from pd in _context.Palette_ds
-                            join p in _context.Palettes on pd.numpal equals p.numpal
                             join b in _context.Bdqs on pd.numbdq equals b.numbdq
                             join d in _context.Dossiers on b.numdos equals d.numdos
                             join v in _context.Vergers on pd.refver equals v.refver
                             join va in _context.Varietes on pd.codvar equals va.codvar
-                            where p.dtepal >= startDate.Date && p.dtepal <= endDateInclusive
-                            select new { pd, p, d, v, va };
+                            where d.dtedep >= startDate.Date && d.dtedep <= endDateInclusive
+                            select new { pd, d, v, va };
 
                 if (vergerId.HasValue) query = query.Where(x => x.pd.refver == vergerId.Value);
                 if (destinationId.HasValue) query = query.Where(x => x.d.coddes == destinationId.Value);
@@ -312,12 +312,11 @@ public class DashboardController : ControllerBase
                 var endDateInclusive = endDate.Date.AddDays(1).AddTicks(-1);
 
                 var query = from pd in _context.Palette_ds
-                            join p in _context.Palettes on pd.numpal equals p.numpal
                             join b in _context.Bdqs on pd.numbdq equals b.numbdq
                             join d in _context.Dossiers on b.numdos equals d.numdos
                             join dest in _context.Destinations on d.coddes equals dest.coddes
                             join va in _context.Varietes on pd.codvar equals va.codvar
-                            where p.dtepal >= startDate.Date && p.dtepal <= endDateInclusive
+                            where d.dtedep >= startDate.Date && d.dtedep <= endDateInclusive
                             // && pd.refver == vergerId  <-- REMOVED HARDCODED FILTER
                             select new { pd, dest, va };
 
@@ -442,12 +441,16 @@ public class DashboardController : ControllerBase
                 else if (chartType.ToLower() == "export")
                 {
                     var exportQuery = _context.Palette_ds.AsQueryable()
-                        .Join(_context.Palettes,
-                              pd => pd.numpal,
-                              p => p.numpal,
-                              (pd, p) => new { PaletteD = pd, Palette = p })
-                        .Where(x => x.Palette.dtepal >= startDate.Date
-                            && x.Palette.dtepal <= endDateInclusive);
+                        .Join(_context.Bdqs,
+                              pd => pd.numbdq,
+                              b => b.numbdq,
+                              (pd, b) => new { pd, b })
+                        .Join(_context.Dossiers,
+                              kb => kb.b.numdos,
+                              d => d.numdos,
+                              (kb, d) => new { PaletteD = kb.pd, Dossier = d })
+                        .Where(x => x.Dossier.dtedep >= startDate.Date
+                            && x.Dossier.dtedep <= endDateInclusive);
 
                     if (vergerId.HasValue)
                     {
@@ -471,7 +474,7 @@ public class DashboardController : ControllerBase
                     }
 
                     var data = await exportQuery
-                        .Select(x => new { Date = x.Palette.dtepal, Value = x.PaletteD.pdscom ?? 0 })
+                        .Select(x => new { Date = x.Dossier.dtedep, Value = x.PaletteD.pdscom ?? 0 })
                         .ToListAsync();
 
                     trendsData = GroupByTimePeriod(data, timePeriod, startDate, endDate);
@@ -753,9 +756,10 @@ public class DashboardController : ControllerBase
                     .Join(_context.Varietes, p => p.codvar, v => v.codvar, (p, v) => new { p, v });
 
                 var exportQuery = _context.Palette_ds
-                    .Join(_context.Palettes, pd => pd.numpal, p => p.numpal, (pd, p) => new { pd, p })
-                    .Where(x => x.p.dtepal >= startDate.Date && x.p.dtepal <= endDateInclusive)
-                    .Join(_context.Varietes, x => x.pd.codvar, v => v.codvar, (x, v) => new { x.pd, x.p, v });
+                    .Join(_context.Bdqs, pd => pd.numbdq, b => b.numbdq, (pd, b) => new { pd, b })
+                    .Join(_context.Dossiers, kb => kb.b.numdos, d => d.numdos, (kb, d) => new { pd = kb.pd, d })
+                    .Where(x => x.d.dtedep >= startDate.Date && x.d.dtedep <= endDateInclusive)
+                    .Join(_context.Varietes, x => x.pd.codvar, v => v.codvar, (x, v) => new { x.pd, x.d, v });
 
                 var ecartQuery = _context.EcartEs
                     .Where(e => e.dtepal >= startDate.Date && e.dtepal <= endDateInclusive)
@@ -793,7 +797,7 @@ public class DashboardController : ControllerBase
                     .ToListAsync();
 
                 var rawExportData = await exportQuery
-                    .Select(x => new { RefVer = (int?)x.pd.refver, CodVar = (int?)x.v.codvar, DtePal = (DateTime?)x.p.dtepal })
+                    .Select(x => new { RefVer = (int?)x.pd.refver, CodVar = (int?)x.v.codvar, DtePal = (DateTime?)x.d.dtedep })
                     .ToListAsync();
 
                 var rawEcartData = await ecartQuery

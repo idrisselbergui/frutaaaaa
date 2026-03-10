@@ -4,6 +4,6 @@
     {
         public int numdos { get; set; }
         public int? coddes { get; set; }
-        // Ajoutez d'autres propriétés si nécessaire
+        public DateTime? dtedep { get; set; }
     }
 }
