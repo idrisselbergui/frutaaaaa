@@ -45,6 +45,9 @@ var journalConnectionString = builder.Configuration.GetConnectionString("Journal
 builder.Services.AddDbContext<AuditDbContext>(options =>
     options.UseMySql(journalConnectionString, ServerVersion.AutoDetect(journalConnectionString)));
 
+// HttpClient for ip-api.com geolocation (used by SessionController)
+builder.Services.AddHttpClient();
+
 var app = builder.Build();
 
 // Set the global service provider so ApplicationDbContext can resolve the audit interceptor
