@@ -1,12 +1,48 @@
 ﻿using frutaaaaa.Models;
+using frutaaaaa.Audit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
 
 namespace frutaaaaa.Data
 {
     public class ApplicationDbContext : DbContext
     {
+        /// <summary>
+        /// Static service provider set once at app startup (Program.cs).
+        /// Used to resolve the scoped AuditInterceptor from OnConfiguring
+        /// without modifying any controller.
+        /// </summary>
+        public static IServiceProvider? ServiceProvider { get; set; }
+
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            base.OnConfiguring(optionsBuilder);
+
+            // Resolve AuditInterceptor from the current HTTP request scope
+            if (ServiceProvider != null)
+            {
+                try
+                {
+                    var httpContextAccessor = ServiceProvider.GetService<IHttpContextAccessor>();
+                    var httpContext = httpContextAccessor?.HttpContext;
+                    if (httpContext != null)
+                    {
+                        var interceptor = httpContext.RequestServices.GetService<AuditInterceptor>();
+                        if (interceptor != null)
+                        {
+                            optionsBuilder.AddInterceptors(interceptor);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fail silently — audit is optional, never break business logic
+                }
+            }
         }
         public DbSet<Defaut> Defauts { get; set; }
 

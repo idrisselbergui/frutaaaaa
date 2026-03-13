@@ -1,4 +1,5 @@
 ﻿using frutaaaaa.Data;
+using frutaaaaa.Audit;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,11 +29,26 @@ builder.Services.AddCors(options =>
 });
 
 // Services
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<AuditActionFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// --- Audit Logging System ---
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<AuditContext>();
+builder.Services.AddScoped<AuditInterceptor>();
+
+var journalConnectionString = builder.Configuration.GetConnectionString("JournalConnection");
+builder.Services.AddDbContext<AuditDbContext>(options =>
+    options.UseMySql(journalConnectionString, ServerVersion.AutoDetect(journalConnectionString)));
+
 var app = builder.Build();
+
+// Set the global service provider so ApplicationDbContext can resolve the audit interceptor
+ApplicationDbContext.ServiceProvider = app.Services;
 
 // Middleware
 if (app.Environment.IsDevelopment())
