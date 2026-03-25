@@ -1,4 +1,4 @@
-﻿using frutaaaaa.Models;
+using frutaaaaa.Models;
 using frutaaaaa.Audit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
@@ -84,6 +84,7 @@ namespace frutaaaaa.Data
         public DbSet<DailyCheckDetail> DailyCheckDetails { get; set; }
 
         public DbSet<GestionAvance> GestionAvances { get; set; }
+        public DbSet<GestionAvanceDetail> GestionAvanceDetails { get; set; }
         public DbSet<Charge> Charges { get; set; }
         public DbSet<PrixEstimatif> PrixEstimatifs { get; set; }
 
@@ -330,6 +331,17 @@ namespace frutaaaaa.Data
                 eb.Property(dd => dd.Quantity).HasColumnName("quantity");
                 
                 // Explicitly ignore navigation property configuration here - it's done above
+            });
+
+            modelBuilder.Entity<GestionAvanceDetail>(eb =>
+            {
+                eb.ToTable("gestionavance_details");
+                eb.HasKey(d => d.Id);
+                eb.Property(d => d.Id).ValueGeneratedOnAdd();
+                eb.HasOne<GestionAvance>()
+                  .WithMany(g => g.Details)
+                  .HasForeignKey(d => d.GestionAvanceId)
+                  .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

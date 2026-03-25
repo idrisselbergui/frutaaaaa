@@ -82,6 +82,7 @@ namespace frutaaaaa.Controllers
                 using (var _context = CreateDbContext(database))
                 {
                     var gestionAvance = await _context.GestionAvances
+                        .Include(g => g.Details)
                         .FirstOrDefaultAsync(g => g.Id == id);
 
                     if (gestionAvance == null)
@@ -106,7 +107,12 @@ namespace frutaaaaa.Controllers
                             gestionAvance.S1, gestionAvance.S2, gestionAvance.S3, gestionAvance.S4, gestionAvance.S5,
                             gestionAvance.RealTS1, gestionAvance.RealTS2, gestionAvance.RealTS3, gestionAvance.RealTS4, gestionAvance.RealTS5,
                             gestionAvance.RealDecS1, gestionAvance.RealDecS2, gestionAvance.RealDecS3, gestionAvance.RealDecS4, gestionAvance.RealDecS5,
-                            gestionAvance.Montant
+                            gestionAvance.Montant,
+                            Details = gestionAvance.Details?.Select(d => new {
+                                d.CodGrv, d.NomGrv, d.PrixEstime,
+                                d.TS1, d.TS2, d.TS3, d.TS4, d.TS5,
+                                d.DecS1, d.DecS2, d.DecS3, d.DecS4, d.DecS5
+                            }).ToList()
                         }
                     };
 
@@ -164,6 +170,45 @@ namespace frutaaaaa.Controllers
                         _context.GestionAvances.Add(avance);
                         await _context.SaveChangesAsync();
 
+                        // Save per-variety detail rows
+                        if (request.Details != null && request.Details.Count > 0)
+                        {
+                            int reqAnnee = request.Annee ?? DateTime.Now.Year;
+                            int reqMois = request.Mois ?? DateTime.Now.Month;
+
+                            foreach (var d in request.Details)
+                            {
+                                _context.GestionAvanceDetails.Add(new GestionAvanceDetail
+                                {
+                                    GestionAvanceId = avance.Id,
+                                    CodGrv = d.CodGrv,
+                                    NomGrv = d.NomGrv,
+                                    PrixEstime = d.PrixEstime,
+                                    TS1 = d.TS1, TS2 = d.TS2, TS3 = d.TS3, TS4 = d.TS4, TS5 = d.TS5,
+                                    DecS1 = d.DecS1, DecS2 = d.DecS2, DecS3 = d.DecS3, DecS4 = d.DecS4, DecS5 = d.DecS5
+                                });
+
+                                // Sync PrixEstimatifs
+                                var existingPrix = await _context.PrixEstimatifs
+                                    .FirstOrDefaultAsync(p => p.Annee == reqAnnee && p.Mois == reqMois && p.CodGrv == d.CodGrv);
+                                if (existingPrix != null)
+                                {
+                                    existingPrix.PrixEstime = d.PrixEstime;
+                                }
+                                else
+                                {
+                                    _context.PrixEstimatifs.Add(new PrixEstimatif 
+                                    {
+                                        Annee = reqAnnee,
+                                        Mois = reqMois,
+                                        CodGrv = d.CodGrv,
+                                        PrixEstime = d.PrixEstime
+                                    });
+                                }
+                            }
+                            await _context.SaveChangesAsync();
+                        }
+
                         await transaction.CommitAsync();
                         return CreatedAtAction(nameof(GetGestionAvance), new { id = avance.Id }, avance);
                     }
@@ -198,7 +243,7 @@ namespace frutaaaaa.Controllers
                         if (existingAvance == null)
                             return NotFound();
 
-                        // Update properties
+                        // Update header properties
                         existingAvance.Refadh = request.Refadh;
                         existingAvance.Date = request.Date;
                         existingAvance.Annee = request.Annee;
@@ -217,6 +262,49 @@ namespace frutaaaaa.Controllers
                         existingAvance.RealDecS3 = request.RealDecS3; existingAvance.RealDecS4 = request.RealDecS4;
                         existingAvance.RealDecS5 = request.RealDecS5;
                         existingAvance.Montant = request.Montant;
+
+                        // Replace old detail rows with new ones
+                        var oldDetails = await _context.GestionAvanceDetails
+                            .Where(d => d.GestionAvanceId == id)
+                            .ToListAsync();
+                        _context.GestionAvanceDetails.RemoveRange(oldDetails);
+
+                        if (request.Details != null && request.Details.Count > 0)
+                        {
+                            int reqAnnee = request.Annee ?? DateTime.Now.Year;
+                            int reqMois = request.Mois ?? DateTime.Now.Month;
+
+                            foreach (var d in request.Details)
+                            {
+                                _context.GestionAvanceDetails.Add(new GestionAvanceDetail
+                                {
+                                    GestionAvanceId = id,
+                                    CodGrv = d.CodGrv,
+                                    NomGrv = d.NomGrv,
+                                    PrixEstime = d.PrixEstime,
+                                    TS1 = d.TS1, TS2 = d.TS2, TS3 = d.TS3, TS4 = d.TS4, TS5 = d.TS5,
+                                    DecS1 = d.DecS1, DecS2 = d.DecS2, DecS3 = d.DecS3, DecS4 = d.DecS4, DecS5 = d.DecS5
+                                });
+
+                                // Sync PrixEstimatifs
+                                var existingPrix = await _context.PrixEstimatifs
+                                    .FirstOrDefaultAsync(p => p.Annee == reqAnnee && p.Mois == reqMois && p.CodGrv == d.CodGrv);
+                                if (existingPrix != null)
+                                {
+                                    existingPrix.PrixEstime = d.PrixEstime;
+                                }
+                                else
+                                {
+                                    _context.PrixEstimatifs.Add(new PrixEstimatif 
+                                    {
+                                        Annee = reqAnnee,
+                                        Mois = reqMois,
+                                        CodGrv = d.CodGrv,
+                                        PrixEstime = d.PrixEstime
+                                    });
+                                }
+                            }
+                        }
 
                         await _context.SaveChangesAsync();
                         await transaction.CommitAsync();
@@ -591,8 +679,32 @@ namespace frutaaaaa.Controllers
                     }
 
                     int daysInMonth = DateTime.DaysInMonth(annee, mois);
-                    DateTime dteStart = new DateTime(annee, mois, 1);
-                    DateTime dteEnd = new DateTime(annee, mois, daysInMonth).AddDays(1).AddTicks(-1);
+                    DateTime firstDayOfMonth = new DateTime(annee, mois, 1);
+                    DateTime lastDayOfMonth  = new DateTime(annee, mois, daysInMonth);
+
+                    // Expand query range to cover the full Mon-Sun span of boundary weeks
+                    // (same majority-rule logic used for bucketing below)
+                    int offsetFirst = ((int)firstDayOfMonth.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                    DateTime firstWeekMonday = firstDayOfMonth.AddDays(-offsetFirst);
+                    DateTime firstWeekSunday = firstWeekMonday.AddDays(6);
+                    DateTime firstOverlapStart = firstWeekMonday < firstDayOfMonth ? firstDayOfMonth : firstWeekMonday;
+                    DateTime firstOverlapEnd   = firstWeekSunday > lastDayOfMonth  ? lastDayOfMonth  : firstWeekSunday;
+                    int firstDaysInMonth = (int)(firstOverlapEnd - firstOverlapStart).TotalDays + 1;
+                    // Use the Monday before the 1st if that first week majority-belongs to this month
+                    DateTime dteStart = (firstDaysInMonth >= 4 && firstWeekMonday < firstDayOfMonth)
+                        ? firstWeekMonday
+                        : firstDayOfMonth;
+
+                    int offsetLast = ((int)lastDayOfMonth.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+                    DateTime lastWeekMonday = lastDayOfMonth.AddDays(-offsetLast);
+                    DateTime lastWeekSunday = lastWeekMonday.AddDays(6);
+                    DateTime lastOverlapStart = lastWeekMonday < firstDayOfMonth ? firstDayOfMonth : lastWeekMonday;
+                    DateTime lastOverlapEnd   = lastWeekSunday > lastDayOfMonth  ? lastDayOfMonth  : lastWeekSunday;
+                    int lastDaysInMonth = (int)(lastOverlapEnd - lastOverlapStart).TotalDays + 1;
+                    // Use the Sunday after the last day if that last week majority-belongs to this month
+                    DateTime dteEnd = (lastDaysInMonth >= 4 && lastWeekSunday > lastDayOfMonth)
+                        ? lastWeekSunday.AddDays(1).AddTicks(-1)
+                        : lastDayOfMonth.AddDays(1).AddTicks(-1);
 
                     var exportQuery = from pd in _context.Palette_ds
                                       join b in _context.Bdqs on pd.numbdq equals b.numbdq
@@ -608,8 +720,6 @@ namespace frutaaaaa.Controllers
                     // --- Real calendar week bucketing (Mon-Sun, majority rule) ---
                     // Step 1: Find all Mon-Sun weeks that "belong" to this month.
                     // A week belongs to a month if >= 4 of its days fall in that month.
-                    DateTime firstDayOfMonth = new DateTime(annee, mois, 1);
-                    DateTime lastDayOfMonth = new DateTime(annee, mois, daysInMonth);
 
                     // Find the Monday of the week containing the 1st of the month
                     int offset = ((int)firstDayOfMonth.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
@@ -738,5 +848,23 @@ namespace frutaaaaa.Controllers
         public double? RealDecS4 { get; set; }
         public double? RealDecS5 { get; set; }
         public double? Montant { get; set; }
+        public List<GestionAvanceDetailDto> Details { get; set; }
+    }
+
+    public class GestionAvanceDetailDto
+    {
+        public int CodGrv { get; set; }
+        public string NomGrv { get; set; }
+        public double PrixEstime { get; set; }
+        public double TS1 { get; set; }
+        public double TS2 { get; set; }
+        public double TS3 { get; set; }
+        public double TS4 { get; set; }
+        public double TS5 { get; set; }
+        public double DecS1 { get; set; }
+        public double DecS2 { get; set; }
+        public double DecS3 { get; set; }
+        public double DecS4 { get; set; }
+        public double DecS5 { get; set; }
     }
 }

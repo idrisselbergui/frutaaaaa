@@ -85,5 +85,8 @@ namespace frutaaaaa.Models
 
         [Column("montant")]
         public double? Montant { get; set; }
+
+        // Navigation property — variety-level detail rows
+        public virtual ICollection<GestionAvanceDetail> Details { get; set; }
     }
 }
