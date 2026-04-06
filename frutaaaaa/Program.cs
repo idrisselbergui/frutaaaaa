@@ -1,4 +1,4 @@
-﻿using frutaaaaa.Data;
+using frutaaaaa.Data;
 using frutaaaaa.Audit;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +18,11 @@ builder.Services.AddCors(options =>
             policy.WithOrigins(
                 "http://localhost:5173",
                 "http://localhost:5174",
+                "http://192.168.10.2:5173",
+                "http://192.168.1.2:5173",  // Common local IPs
+                "http://192.168.1.10:5173",
+                "http://192.168.1.15:5173",
+                "http://192.168.1.20:5173",
                 "https://fruta-six.vercel.app",
                 "https://fruta-api.ddnsfree.com", // Or your latest DDNS
                 " https://scandic-hermine-snuffly.ngrok-free.dev", // Or your latest DDNS
@@ -70,10 +75,19 @@ else
 
 //app.UseHttpsRedirection(); // keep this: redirects http:// to https://
 
+// Serve React frontend from wwwroot/ (local deployment mode)
+// These must come BEFORE UseCors/UseAuthorization
+app.UseDefaultFiles();  // maps / → index.html
+app.UseStaticFiles();   // serves JS, CSS, and other static assets
+
 app.UseCors("AllowReactApp");
 
 app.UseAuthorization();
 
 app.MapControllers();
+
+// SPA fallback: serve index.html for any route not handled by a controller
+// This allows React Router to handle client-side routes (e.g. /dashboard, /program)
+app.MapFallbackToFile("index.html");
 
 app.Run();
