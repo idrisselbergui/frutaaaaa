@@ -342,7 +342,9 @@ namespace frutaaaaa.Controllers
                     int yearDebut = dateDebut.Year, yearFin = dateFin.Year;
 
                     // All gestionavances for this adherent across the full date range years
+                    // Include Details so we can read per-variety PrixEstime from the adherent's own saved data
                     var avances = await _context.GestionAvances
+                        .Include(g => g.Details)
                         .Where(g => g.Refadh == refadh && g.Annee >= yearDebut && g.Annee <= yearFin)
                         .ToListAsync();
 
@@ -494,6 +496,12 @@ namespace frutaaaaa.Controllers
                         var weekToSem = new Dictionary<DateTime, int>();
                         for (int wi = 0; wi < mWeeks.Count; wi++) weekToSem[mWeeks[wi]] = wi + 1;
 
+                        // Build price lookup: prefer adherent's own saved prices from gestionavance_details,
+                        // fall back to global prix_estimatifs when no saved décompte details exist
+                        var adherentPrices = (ga?.Details != null && ga.Details.Any())
+                            ? ga.Details.ToDictionary(d => d.CodGrv, d => d.PrixEstime)
+                            : null;
+
                         // Calculate weighted theoretical value AND per-week weighted values
                         // Each week's DH = Σ(variety_tonnage × variety_price) for all varieties
                         double weightedTheoreticalValue = 0;
@@ -509,10 +517,21 @@ namespace frutaaaaa.Controllers
                             // Only include if this export's week belongs to the current month in the report
                             if (weekToSem.TryGetValue(itemMon, out int sem))
                             {
-                                var price = allPrices.FirstOrDefault(p => p.Annee == yr && p.Mois == mois && p.CodGrv == item.codgrv);
-                                if (price != null)
+                                // Use adherent's own price if available, otherwise fall back to global prix_estimatifs
+                                double priceVal = 0;
+                                if (adherentPrices != null && adherentPrices.TryGetValue(item.codgrv, out double adhPrice))
                                 {
-                                    double val = (double)(item.pdscom ?? 0) * (double)price.PrixEstime;
+                                    priceVal = adhPrice;
+                                }
+                                else
+                                {
+                                    var globalPrice = allPrices.FirstOrDefault(p => p.Annee == yr && p.Mois == mois && p.CodGrv == item.codgrv);
+                                    if (globalPrice != null) priceVal = (double)globalPrice.PrixEstime;
+                                }
+
+                                if (priceVal > 0)
+                                {
+                                    double val = (double)(item.pdscom ?? 0) * priceVal;
                                     weightedTheoreticalValue += val;
                                     switch (sem) { case 1: weightedS1 += val; break; case 2: weightedS2 += val; break; case 3: weightedS3 += val; break; case 4: weightedS4 += val; break; case 5: weightedS5 += val; break; }
                                 }
@@ -575,7 +594,12 @@ namespace frutaaaaa.Controllers
                                 chargesByLabel = chargesByLabel,
                                 totalCharges = totalCharges,
                                 resultat = realDecTotal - totalCharges,
-                                pricesByGrpVar = allPrices.Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
+                                // Use adherent's own per-variety prices from gestionavance_details when available
+                                pricesByGrpVar = (ga.Details != null && ga.Details.Any())
+                                    ? ga.Details
+                                        .Where(d => exportedCodGrvs.Contains(d.CodGrv))
+                                        .ToDictionary(d => d.CodGrv.ToString(), d => d.PrixEstime)
+                                    : allPrices.Where(pe => pe.Annee == yr && pe.Mois == mois && exportedCodGrvs.Contains(pe.CodGrv))
                                                  .ToDictionary(pe => pe.CodGrv.ToString(), pe => pe.PrixEstime)
                             };
                         }
