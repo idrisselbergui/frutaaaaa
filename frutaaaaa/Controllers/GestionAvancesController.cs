@@ -541,8 +541,7 @@ namespace frutaaaaa.Controllers
 
                         var validRanges = GetValidRanges(yr, mois);
                         var mc = rawCharges
-                            .Where(c => c.Date.Year == yr
-                                     && validRanges.Any(r => c.Date.Date >= r.Start && c.Date.Date <= r.End))
+                            .Where(c => validRanges.Any(r => c.Date.Date >= r.Start && c.Date.Date <= r.End))
                             .ToList();
 
                         var chargesByLabel = mc
