@@ -116,3 +116,231 @@ const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
 ```
 
 If you change sidebar behavior, update both the state logic and the `localStorage` writes in the same file.
+
+## Standardized Pagination Rule
+
+To ensure a consistent, premium UI/UX across the entire application, all paginated pages must adhere to the standardized pagination design system.
+
+### 1. Pagination Logic (useMemo Centered Ellipsis Truncation)
+Avoid displaying all page buttons at once. Instead, compute page numbers dynamically using `useMemo` with centered ellipsis truncation:
+
+```jsx
+const pageNumbers = useMemo(() => {
+    const pages = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+        for (let i = 1; i <= totalPages; i++) {
+            pages.push(i);
+        }
+    } else {
+        // Always show the first page
+        pages.push(1);
+
+        // Calculate start and end for middle block centered on currentPage
+        let start = Math.max(2, currentPage - 1);
+        let end = Math.min(totalPages - 1, currentPage + 1);
+
+        // Adjust if we are close to boundaries
+        if (currentPage <= 3) {
+            end = 4;
+        } else if (currentPage >= totalPages - 2) {
+            start = totalPages - 3;
+        }
+
+        // Add left ellipsis before middle block if needed
+        if (start > 2) {
+            pages.push('...');
+        }
+
+        // Add middle block page numbers
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+
+        // Add right ellipsis after middle block if needed
+        if (end < totalPages - 1) {
+            pages.push('...');
+        }
+
+        // Always show the last page
+        pages.push(totalPages);
+    }
+    return pages;
+}, [currentPage, totalPages]);
+```
+
+### 2. Standardized HTML Markup
+Use the exact same HTML elements and class names to structure the pagination block to avoid clipping and style inconsistencies:
+
+```jsx
+{totalPages > 1 && (
+    <div className="pagination-container">
+        {totalItems > 0 && (
+            <div className="pagination-info">
+                Page {currentPage} sur {totalPages} ({totalItems} éléments)
+            </div>
+        )}
+        <div className="pagination">
+            <button
+                className="pagination-nav"
+                onClick={() => setCurrentPage(c => Math.max(1, c - 1))}
+                disabled={currentPage === 1}
+                aria-label="Previous page"
+            >
+                <span className="nav-arrow">«</span> Précédent
+            </button>
+            <div className="pagination-numbers">
+                {pageNumbers.map((p, i) => (
+                    p === '...' ? (
+                        <span key={`ellipsis-${i}`} className="pagination-ellipsis">...</span>
+                    ) : (
+                        <button
+                            key={p}
+                            className={`pagination-number ${currentPage === p ? 'active' : ''}`}
+                            onClick={() => setCurrentPage(p)}
+                        >
+                            {p}
+                        </button>
+                    )
+                ))}
+            </div>
+            <button
+                className="pagination-nav"
+                onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))}
+                disabled={currentPage === totalPages}
+                aria-label="Next page"
+            >
+                Suivant <span className="nav-arrow">»</span>
+            </button>
+        </div>
+    </div>
+)}
+```
+
+### 3. Unified CSS Styles
+All navigation buttons (`.pagination-nav`) and number buttons (`.pagination-number`) must be `48px` high with `8px` border-radius and standard hover/active blue themes. Navigation buttons must use `width: auto` to prevent text truncation:
+
+```css
+/* Modern Pagination Styles */
+.pagination-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+  padding: 1.5rem 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.pagination-info {
+  font-size: 1rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-align: center;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pagination-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 1.5rem !important; /* Force padding to prevent text truncation */
+  width: auto !important; /* Override any global 48px constraints */
+  min-width: fit-content !important;
+  max-width: none !important;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #007bff;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-sizing: border-box; /* Force padding inside dimensions */
+}
+
+.pagination-nav:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #007bff;
+  color: #0056b3;
+}
+
+.pagination-nav:disabled {
+  opacity: 0.5;
+  background: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+.pagination-ellipsis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  color: #6b7280;
+  font-size: 1.1rem;
+  font-weight: bold;
+  user-select: none;
+}
+
+.nav-arrow {
+  font-size: 1.2rem;
+  font-weight: bold;
+  line-height: 1;
+  margin: 0 4px;
+  display: inline-block;
+  transform: translateY(-1px);
+}
+
+.pagination-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0.5rem;
+}
+
+.pagination-number,
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-number:hover,
+.pagination-btn:hover:not(:disabled) {
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.pagination-number.active,
+.pagination-btn.active {
+  background: #007bff;
+  border-color: #007bff;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 6px rgba(0, 123, 255, 0.2);
+}
+```
+

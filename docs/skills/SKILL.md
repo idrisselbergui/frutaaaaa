@@ -191,6 +191,7 @@ When changing business logic, add manual verification notes because there is no 
 5. Be careful with schema changes: some domains are managed by EF migrations, others by standalone SQL files and manual tables.
 6. Avoid editing committed secrets/connection strings casually; flag them as risks rather than normalizing them.
 7. Preserve response shapes that the existing frontend already expects, especially anonymous JSON casing like `page_name`, `allowed`, `message`, `data`, and `totalPdsfru`.
+8. All frontend pagination must strictly use the unified pagination standard (centered ellipsis logic in React and 48px height layout in CSS) detailed in [SKILL_frontend.md](SKILL_frontend.md) to guarantee UI consistency and prevent navigation button text truncation.
 
 ## Run locally
 
