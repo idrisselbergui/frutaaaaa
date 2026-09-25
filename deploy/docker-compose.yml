@@ -1,0 +1,23 @@
+services:
+  fruta:
+    build: .
+    image: fruta:latest
+    container_name: fruta
+    ports:
+      - "5005:8080"           # http://SERVER-IP:5005
+    environment:
+      # Must match the Windows clock (the old app saved Windows local time).
+      # Morocco is currently UTC+0 per Windows and phones; the Linux rules for
+      # Africa/Casablanca in the image say +1, so a fixed UTC is used instead.
+      # If Windows changes offset (e.g. to UTC+1), set TZ: Etc/GMT-1 and run: docker compose up -d
+      TZ: UTC
+    env_file:
+      - path: .env            # optional overrides, see .env.example
+        required: false
+    restart: unless-stopped   # starts again after a crash or a reboot
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
