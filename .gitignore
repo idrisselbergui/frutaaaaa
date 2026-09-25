@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Fruta: build output and archives never belong in git
+fruta_deploy/
+dist/
+*.zip
+*.rar
+*.7z
